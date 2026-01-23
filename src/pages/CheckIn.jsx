@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   MapPin, LogIn, LogOut, Clock, CheckCircle, XCircle, AlertCircle,
   Navigation, RefreshCw, User, Calendar, Timer
 } from 'lucide-react';
@@ -11,13 +11,55 @@ function CheckIn() {
   const [funcionarios, setFuncionarios] = useState([]);
   const [funcionarioSelecionado, setFuncionarioSelecionado] = useState('');
   const [localizacao, setLocalizacao] = useState(null);
+  const [enderecoAtual, setEnderecoAtual] = useState(null);
   const [carregandoLocalizacao, setCarregandoLocalizacao] = useState(false);
   const [presencaHoje, setPresencaHoje] = useState(null);
   const [hospitais, setHospitais] = useState([]);
+  const [enderecosHospitais, setEnderecosHospitais] = useState({});
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModalHoraExtra, setShowModalHoraExtra] = useState(false);
   const [motivoHoraExtra, setMotivoHoraExtra] = useState('');
+
+  // Função para converter coordenadas em endereço amigável (Geocodificação Reversa)
+  const geocodificarReverso = async (latitude, longitude) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+        {
+          headers: {
+            'Accept-Language': 'pt-BR',
+            'User-Agent': 'EscalaPro/1.0'
+          }
+        }
+      );
+      const data = await response.json();
+
+      if (data && data.address) {
+        const addr = data.address;
+        // Montar endereço amigável
+        const partes = [];
+
+        if (addr.road) partes.push(addr.road);
+        if (addr.house_number) partes[0] = `${addr.road}, ${addr.house_number}`;
+        if (addr.suburb || addr.neighbourhood) partes.push(addr.suburb || addr.neighbourhood);
+        if (addr.city || addr.town || addr.village) partes.push(addr.city || addr.town || addr.village);
+        if (addr.state) partes.push(addr.state);
+
+        return {
+          enderecoCompleto: data.display_name,
+          enderecoResumido: partes.slice(0, 3).join(', ') || 'Localização obtida',
+          bairro: addr.suburb || addr.neighbourhood || '',
+          cidade: addr.city || addr.town || addr.village || '',
+          estado: addr.state || ''
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro na geocodificação reversa:', error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     fetchDados();
@@ -37,7 +79,20 @@ function CheckIn() {
         fetch(`${API_URL}/hospitais`)
       ]);
       setFuncionarios(await funcRes.json());
-      setHospitais(await hospRes.json());
+      const hospitaisData = await hospRes.json();
+      setHospitais(hospitaisData);
+
+      // Buscar endereços amigáveis para os hospitais
+      const enderecos = {};
+      for (const hospital of hospitaisData) {
+        if (hospital.latitude && hospital.longitude) {
+          const endereco = await geocodificarReverso(hospital.latitude, hospital.longitude);
+          if (endereco) {
+            enderecos[hospital.id] = endereco;
+          }
+        }
+      }
+      setEnderecosHospitais(enderecos);
     } catch (error) {
       console.error('Erro:', error);
     } finally {
@@ -67,7 +122,8 @@ function CheckIn() {
 
   const obterLocalizacao = () => {
     setCarregandoLocalizacao(true);
-    
+    setEnderecoAtual(null);
+
     if (!navigator.geolocation) {
       alert('Geolocalização não suportada pelo navegador');
       setCarregandoLocalizacao(false);
@@ -75,12 +131,20 @@ function CheckIn() {
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
         setLocalizacao({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          latitude: lat,
+          longitude: lng,
           accuracy: position.coords.accuracy
         });
+
+        // Buscar endereço amigável
+        const endereco = await geocodificarReverso(lat, lng);
+        setEnderecoAtual(endereco);
+
         setCarregandoLocalizacao(false);
       },
       (error) => {
@@ -109,7 +173,7 @@ function CheckIn() {
         })
       });
       const data = await res.json();
-      
+
       if (data.success) {
         alert(`Check-in realizado às ${data.hora}!\n\n` +
           `Status: ${data.status.toUpperCase()}\n` +
@@ -145,7 +209,7 @@ function CheckIn() {
         })
       });
       const data = await res.json();
-      
+
       if (data.success) {
         let msg = `Check-out realizado às ${data.hora}!`;
         if (data.hora_extra_minutos > 0) {
@@ -182,12 +246,12 @@ function CheckIn() {
         })
       });
       const data = await res.json();
-      
+
       alert(`Localização atualizada!\n\n` +
         `Distância: ${data.distancia ? (data.distancia / 1000).toFixed(2) + ' km' : 'N/A'}\n` +
         `${data.dentro_raio ? '✅ Dentro do raio' : '⚠️ Fora do raio'}\n` +
         `${data.alerta_enviado ? '🚨 Alerta enviado ao gestor' : ''}`);
-      
+
       fetchHistorico();
     } catch (error) {
       console.error('Erro:', error);
@@ -250,7 +314,7 @@ function CheckIn() {
           </div>
           <div className="form-group">
             <label className="form-label">Localização</label>
-            <button 
+            <button
               className="btn btn-primary w-full"
               onClick={obterLocalizacao}
               disabled={carregandoLocalizacao}
@@ -264,11 +328,24 @@ function CheckIn() {
         {localizacao && (
           <div className="alert alert-info mt-2">
             <MapPin size={20} />
-            <div>
-              <p className="font-semibold">Localização obtida!</p>
-              <p className="text-sm">
-                Lat: {localizacao.latitude.toFixed(6)} | Lng: {localizacao.longitude.toFixed(6)}
-                {localizacao.accuracy && ` | Precisão: ${localizacao.accuracy.toFixed(0)}m`}
+            <div style={{ flex: 1 }}>
+              <p className="font-semibold">📍 Localização obtida!</p>
+              {enderecoAtual ? (
+                <>
+                  <p className="text-sm" style={{ fontWeight: 500 }}>
+                    {enderecoAtual.enderecoResumido}
+                  </p>
+                  {enderecoAtual.cidade && enderecoAtual.estado && (
+                    <p className="text-xs text-secondary">
+                      {enderecoAtual.cidade}, {enderecoAtual.estado}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm">Buscando endereço...</p>
+              )}
+              <p className="text-xs text-secondary" style={{ marginTop: '4px' }}>
+                Precisão: {localizacao.accuracy?.toFixed(0) || '?'}m
               </p>
             </div>
           </div>
@@ -327,10 +404,10 @@ function CheckIn() {
             <div className="card-header">
               <h2 className="card-title">Ações</h2>
             </div>
-            
+
             <div className="flex flex-wrap gap-2">
               {!presencaHoje?.hora_entrada && presencaHoje && (
-                <button 
+                <button
                   className="btn btn-success"
                   onClick={fazerCheckIn}
                   disabled={!localizacao}
@@ -342,7 +419,7 @@ function CheckIn() {
 
               {presencaHoje?.hora_entrada && !presencaHoje?.hora_saida && (
                 <>
-                  <button 
+                  <button
                     className="btn btn-danger"
                     onClick={() => fazerCheckOut(false)}
                     disabled={!localizacao}
@@ -350,8 +427,8 @@ function CheckIn() {
                     <LogOut size={20} />
                     Fazer Check-out
                   </button>
-                  
-                  <button 
+
+                  <button
                     className="btn btn-warning"
                     onClick={() => setShowModalHoraExtra(true)}
                     disabled={!localizacao}
@@ -360,7 +437,7 @@ function CheckIn() {
                     Check-out com Hora Extra
                   </button>
 
-                  <button 
+                  <button
                     className="btn btn-secondary"
                     onClick={atualizarLocalizacao}
                     disabled={!localizacao}
@@ -393,21 +470,31 @@ function CheckIn() {
               <div className="card-header">
                 <h2 className="card-title">Hospitais Cadastrados</h2>
               </div>
-              
-              {hospitais.map(h => (
-                <div key={h.id} className="notification-item" style={{ borderBottom: '1px solid var(--border)' }}>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="text-primary" size={20} />
-                    <div>
-                      <p className="font-semibold">{h.nome}</p>
-                      <p className="text-sm text-secondary">{h.endereco}</p>
-                      <p className="text-xs text-secondary">
-                        Raio: {h.raio_metros}m | Lat: {h.latitude}, Lng: {h.longitude}
-                      </p>
+
+              {hospitais.map(h => {
+                const endHosp = enderecosHospitais[h.id];
+                return (
+                  <div key={h.id} className="notification-item" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="text-primary" size={20} />
+                      <div>
+                        <p className="font-semibold">🏥 {h.nome}</p>
+                        <p className="text-sm text-secondary">
+                          {endHosp ? endHosp.enderecoResumido : (h.endereco || 'Carregando endereço...')}
+                        </p>
+                        {endHosp && endHosp.cidade && (
+                          <p className="text-xs text-secondary">
+                            {endHosp.cidade}, {endHosp.estado}
+                          </p>
+                        )}
+                        <p className="text-xs" style={{ color: 'var(--primary)', marginTop: '4px' }}>
+                          📍 Raio de cobertura: {h.raio_metros}m
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Histórico de Localizações */}
@@ -415,7 +502,7 @@ function CheckIn() {
               <div className="card-header">
                 <h2 className="card-title">Histórico de Localizações</h2>
               </div>
-              
+
               {historico.length > 0 ? (
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                   {historico.slice(0, 10).map(loc => (
@@ -431,8 +518,8 @@ function CheckIn() {
                         </div>
                         <div className="text-right">
                           <p className="text-sm">
-                            {loc.distancia_hospital 
-                              ? `${(loc.distancia_hospital / 1000).toFixed(2)} km` 
+                            {loc.distancia_hospital
+                              ? `${(loc.distancia_hospital / 1000).toFixed(2)} km`
                               : 'N/A'}
                           </p>
                           <p className="text-xs text-secondary">do hospital</p>
@@ -462,12 +549,12 @@ function CheckIn() {
                 <XCircle size={24} />
               </button>
             </div>
-            
+
             <div className="alert alert-info mb-3">
               <Timer size={20} />
               <span>Você está saindo após o horário previsto. O tempo extra será registrado.</span>
             </div>
-            
+
             <div className="form-group">
               <label className="form-label">Motivo da Hora Extra *</label>
               <textarea
@@ -479,13 +566,13 @@ function CheckIn() {
                 required
               />
             </div>
-            
+
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowModalHoraExtra(false)}>
                 Cancelar
               </button>
-              <button 
-                className="btn btn-warning" 
+              <button
+                className="btn btn-warning"
                 onClick={() => fazerCheckOut(true)}
                 disabled={!motivoHoraExtra.trim()}
               >

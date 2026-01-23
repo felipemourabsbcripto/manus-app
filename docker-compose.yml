@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: manus-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=manusapp
+      - DB_USER=dbadmin
+      - DB_PASSWORD=${DB_PASSWORD:-manusapp123}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/funcionarios', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - manus-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: manus-postgres
+    environment:
+      - POSTGRES_USER=dbadmin
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-manusapp123}
+      - POSTGRES_DB=manusapp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbadmin -d manusapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - manus-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: manus-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - manus-network
+
+volumes:
+  postgres_data:
+
+networks:
+  manus-network:
+    driver: bridge

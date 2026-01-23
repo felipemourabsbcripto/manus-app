@@ -1,0 +1,29 @@
+{
+  "Comment": "Alias records for Load Balancer",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "escalaprohscmbh.com.br.",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "Z35SXDOTRQ7X7K",
+          "DNSName": "manus-app-prod-alb-1008927625.us-east-1.elb.amazonaws.com",
+          "EvaluateTargetHealth": false
+        }
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "www.escalaprohscmbh.com.br.",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "Z35SXDOTRQ7X7K",
+          "DNSName": "manus-app-prod-alb-1008927625.us-east-1.elb.amazonaws.com",
+          "EvaluateTargetHealth": false
+        }
+      }
+    }
+  ]
+}

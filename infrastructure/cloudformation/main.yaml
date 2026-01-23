@@ -1,0 +1,647 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Manus App - Production Infrastructure with Auto Scaling'
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: manus-app-prod
+
+  VpcCIDR:
+    Description: IP range for this VPC
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnet1CIDR:
+    Description: IP range for the public subnet in AZ1
+    Type: String
+    Default: 10.0.1.0/24
+
+  PublicSubnet2CIDR:
+    Description: IP range for the public subnet in AZ2
+    Type: String
+    Default: 10.0.2.0/24
+
+  PrivateSubnet1CIDR:
+    Description: IP range for the private subnet in AZ1
+    Type: String
+    Default: 10.0.10.0/24
+
+  PrivateSubnet2CIDR:
+    Description: IP range for the private subnet in AZ2
+    Type: String
+    Default: 10.0.20.0/24
+
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t3.small
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+
+  MinSize:
+    Description: Minimum number of instances in ASG
+    Type: Number
+    Default: 2
+
+  MaxSize:
+    Description: Maximum number of instances in ASG
+    Type: Number
+    Default: 6
+
+  DesiredCapacity:
+    Description: Desired number of instances in ASG
+    Type: Number
+    Default: 2
+
+  KeyName:
+    Description: Name of an existing EC2 KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: manus-app-key
+
+  DBInstanceClass:
+    Description: Database instance class
+    Type: String
+    Default: db.t3.micro
+
+  DBName:
+    Description: Database name
+    Type: String
+    Default: manusapp
+
+  DBUsername:
+    Description: Database admin username
+    Type: String
+    Default: dbadmin
+    NoEcho: true
+
+  DBPassword:
+    Description: Database admin password
+    Type: String
+    NoEcho: true
+    MinLength: 8
+
+Resources:
+  # ============ NETWORKING ============
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-igw
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-subnet-1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-subnet-2
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-subnet-1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-subnet-2
+
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-nat-1
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-routes-1
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet2
+
+  # ============ SECURITY GROUPS ============
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-alb-sg
+      GroupDescription: Security group for Application Load Balancer
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-alb-sg
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-ec2-sg
+      GroupDescription: Security group for EC2 instances
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 5173
+          ToPort: 5173
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-ec2-sg
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-rds-sg
+      GroupDescription: Security group for RDS
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-rds-sg
+
+  # ============ IAM ROLE ============
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EnvironmentName}-ec2-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${EnvironmentName}-assets/*
+                  - !Sub arn:aws:s3:::${EnvironmentName}-assets
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${EnvironmentName}-ec2-profile
+      Roles:
+        - !Ref EC2Role
+
+  # ============ RDS DATABASE ============
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for Manus App RDS
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-db-subnet-group
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub ${EnvironmentName}-db
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: postgres
+      EngineVersion: '16.6'
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBName: !Ref DBName
+      AllocatedStorage: 20
+      StorageType: gp2
+      MultiAZ: false
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      BackupRetentionPeriod: 1
+      DeletionProtection: false
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-db
+
+  # ============ APPLICATION LOAD BALANCER ============
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${EnvironmentName}-alb
+      Scheme: internet-facing
+      Type: application
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-alb
+
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${EnvironmentName}-tg
+      Port: 3000
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      HealthCheckPath: /api/funcionarios
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-tg
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTargetGroup
+
+  # ============ LAUNCH TEMPLATE ============
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${EnvironmentName}-launch-template
+      LaunchTemplateData:
+        ImageId: ami-07ff62358b87c7116  # Amazon Linux 2023 (us-east-1)
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        IamInstanceProfile:
+          Arn: !GetAtt EC2InstanceProfile.Arn
+        SecurityGroupIds:
+          - !Ref EC2SecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -e
+            
+            # Update system and install tools
+            dnf update -y
+            dnf install -y git ruby wget tar
+            
+            # Install Node.js 22 LTS (Binary) - Infallible method
+            cd /usr/local
+            wget https://nodejs.org/dist/v22.13.1/node-v22.13.1-linux-x64.tar.xz
+            tar -xJf node-v22.13.1-linux-x64.tar.xz --strip-components=1
+            rm node-v22.13.1-linux-x64.tar.xz
+            ln -sf /usr/local/bin/node /usr/bin/node
+            ln -sf /usr/local/bin/npm /usr/bin/npm
+            ln -sf /usr/local/bin/npx /usr/bin/npx
+            
+            # Verify Node version
+            node -v
+            
+            # Install Development Tools for native modules
+            dnf groupinstall -y "Development Tools"
+            dnf install -y make gcc-c++
+            
+            # Install PM2 and build tools globally
+            npm install -g pm2 typescript vite
+            
+            # Create app directory
+            mkdir -p /opt/manus-app
+            cd /opt/manus-app
+            
+            # Clone application
+            git clone https://github.com/felipemourabsbcripto/manus-app.git .
+            
+            # Install dependencies
+            npm install --production
+            npm install --save-dev vite @vitejs/plugin-react
+            
+            # Build frontend
+            npm run build
+            
+            # Create environment file
+            cat > /opt/manus-app/.env << 'EOF'
+            NODE_ENV=production
+            PORT=3000
+            DB_HOST=${RDSInstance.Endpoint.Address}
+            DB_PORT=5432
+            DB_NAME=${DBName}
+            DB_USER=${DBUsername}
+            DB_PASSWORD=${DBPassword}
+            EOF
+            
+            # Start application with PM2
+            export PORT=3000
+            pm2 start server/index.js --name manus-app
+            pm2 startup
+            pm2 save
+            
+            # Install and configure CloudWatch agent
+            dnf install -y amazon-cloudwatch-agent
+            
+            cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOF'
+            {
+              "agent": {
+                "metrics_collection_interval": 60
+              },
+              "metrics": {
+                "metrics_collected": {
+                  "cpu": {
+                    "measurement": ["cpu_usage_idle", "cpu_usage_user", "cpu_usage_system"],
+                    "metrics_collection_interval": 60
+                  },
+                  "mem": {
+                    "measurement": ["mem_used_percent"],
+                    "metrics_collection_interval": 60
+                  },
+                  "disk": {
+                    "measurement": ["disk_used_percent"],
+                    "metrics_collection_interval": 60,
+                    "resources": ["/"]
+                  }
+                }
+              },
+              "logs": {
+                "logs_collected": {
+                  "files": {
+                    "collect_list": [
+                      {
+                        "file_path": "/root/.pm2/logs/manus-app-out.log",
+                        "log_group_name": "/manus-app/application",
+                        "log_stream_name": "{instance_id}/application"
+                      },
+                      {
+                        "file_path": "/root/.pm2/logs/manus-app-error.log",
+                        "log_group_name": "/manus-app/errors",
+                        "log_stream_name": "{instance_id}/errors"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+            EOF
+            
+            /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}-instance
+
+  # ============ AUTO SCALING GROUP ============
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub ${EnvironmentName}-asg
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: !Ref MinSize
+      MaxSize: !Ref MaxSize
+      DesiredCapacity: !Ref DesiredCapacity
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      TargetGroupARNs:
+        - !Ref ALBTargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-asg
+          PropagateAtLaunch: true
+
+  # ============ AUTO SCALING POLICIES ============
+  ScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 70.0
+
+  ScaleUpOnRequestCount:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ALBRequestCountPerTarget
+          ResourceLabel: !Sub ${ApplicationLoadBalancer.LoadBalancerFullName}/${ALBTargetGroup.TargetGroupFullName}
+        TargetValue: 1000
+
+  # ============ CLOUDWATCH ALARMS ============
+  HighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${EnvironmentName}-high-cpu
+      AlarmDescription: Alarm when CPU exceeds 80%
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref AutoScalingGroup
+
+  HighMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${EnvironmentName}-high-memory
+      AlarmDescription: Alarm when memory usage exceeds 80%
+      MetricName: mem_used_percent
+      Namespace: CWAgent
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref AutoScalingGroup
+
+  UnhealthyHostsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${EnvironmentName}-unhealthy-hosts
+      AlarmDescription: Alarm when there are unhealthy hosts
+      MetricName: UnHealthyHostCount
+      Namespace: AWS/ApplicationELB
+      Statistic: Average
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: !GetAtt ALBTargetGroup.TargetGroupFullName
+        - Name: LoadBalancer
+          Value: !GetAtt ApplicationLoadBalancer.LoadBalancerFullName
+
+Outputs:
+  VPCId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${EnvironmentName}-VPCId
+
+  LoadBalancerDNS:
+    Description: Application Load Balancer DNS Name
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub ${EnvironmentName}-LoadBalancerDNS
+
+  LoadBalancerURL:
+    Description: Application URL
+    Value: !Sub http://${ApplicationLoadBalancer.DNSName}
+
+  RDSEndpoint:
+    Description: RDS Database Endpoint
+    Value: !GetAtt RDSInstance.Endpoint.Address
+    Export:
+      Name: !Sub ${EnvironmentName}-RDSEndpoint
+
+  AutoScalingGroupName:
+    Description: Auto Scaling Group Name
+    Value: !Ref AutoScalingGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-ASGName

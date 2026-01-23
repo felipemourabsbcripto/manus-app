@@ -10,7 +10,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS funcionarios (
     id TEXT PRIMARY KEY,
     nome TEXT NOT NULL,
-    email TEXT,
+    email TEXT UNIQUE,
+    senha TEXT,
     telefone TEXT,
     whatsapp TEXT,
     cargo TEXT,
@@ -24,7 +25,31 @@ db.exec(`
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (gestor_id) REFERENCES funcionarios(id)
   );
+`);
 
+
+// Migration para adicionar senha em bancos existentes
+try {
+  db.exec("ALTER TABLE funcionarios ADD COLUMN senha TEXT");
+} catch (err) {
+  // Coluna já existe, ignorar
+}
+
+// Criar usuário Admin padrão se não existir nenhum funcionário
+const adminExiste = db.prepare("SELECT COUNT(*) as count FROM funcionarios WHERE email = 'admin@manus.com'").get();
+if (adminExiste.count === 0) {
+  // Senha padrão:admin123 (em um app real, use hash/salt)
+  const adminId = uuidv4();
+  db.prepare(`
+      INSERT INTO funcionarios(id, nome, email, senha, tipo, cargo) 
+      VALUES(?, ?, ?, ?, ?, ?)
+    `).run(adminId, 'Administrador', 'admin@manus.com', 'admin123', 'admin', 'Administrador do Sistema');
+}
+
+
+
+// Continuar criando as outras tabelas
+db.exec(`
   -- Turnos disponíveis
   CREATE TABLE IF NOT EXISTS turnos (
     id TEXT PRIMARY KEY,
@@ -52,7 +77,7 @@ db.exec(`
   -- Presenças/Furos
   CREATE TABLE IF NOT EXISTS presencas (
     id TEXT PRIMARY KEY,
-    escala_id TEXT NOT NULL,
+    escala_id TEXT,
     funcionario_id TEXT NOT NULL,
     data TEXT NOT NULL,
     hora_entrada TEXT,

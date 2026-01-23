@@ -1,0 +1,31 @@
+{
+    "Comment": "DNS Validation for ACM Certificate",
+    "Changes": [
+        {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+                "Name": "_3d99d92807c50490974f537c5b06bb40.escalaprohscmbh.com.br.",
+                "Type": "CNAME",
+                "TTL": 300,
+                "ResourceRecords": [
+                    {
+                        "Value": "_b4d79e6b739c751bcba3d230b08a0a9e.jkddzztszm.acm-validations.aws."
+                    }
+                ]
+            }
+        },
+        {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+                "Name": "_c39a05133d6944d40d14418946a792ae.www.escalaprohscmbh.com.br.",
+                "Type": "CNAME",
+                "TTL": 300,
+                "ResourceRecords": [
+                    {
+                        "Value": "_079c4f8082190b8b39c5fa8a42146a11.jkddzztszm.acm-validations.aws."
+                    }
+                ]
+            }
+        }
+    ]
+}
