@@ -83,9 +83,13 @@ Parameters:
     Type: String
     NoEcho: true
     MinLength: 8
+  CertificateArn:
+    Description: ARN of the ACM Certificate
+    Type: String
+    Default: arn:aws:acm:us-east-1:482084865575:certificate/252ca543-79d8-4a1a-bee4-ed5e81763e7b
 
 Resources:
-  # ============ NETWORKING ============
+
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -392,6 +396,21 @@ Resources:
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 80
       Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301
+
+  ALBListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref ALBTargetGroup
