@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const db = require('./database');
 const whatsapp = require('./whatsapp');
@@ -1103,6 +1104,15 @@ setInterval(async () => {
     console.error('Erro nas verificações automáticas:', error);
   }
 }, 60000);
+
+// Servir arquivos estáticos do React em produção
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// Rota "catch-all" para servir o index.html do React para qualquer rota não-API
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
