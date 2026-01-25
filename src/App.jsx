@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, Clock, AlertTriangle,
-  DollarSign, Bell, Settings, Star, MessageSquare, MapPin, FileText, LogOut
+  DollarSign, Bell, Settings, Star, MessageSquare, MapPin, FileText, LogOut, Heart
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Funcionarios from './pages/Funcionarios';
@@ -58,7 +58,7 @@ const AppLayout = () => {
     <div className="app-container">
       <nav className="sidebar">
         <div className="logo">
-          <Star size={32} fill="var(--primary)" color="var(--primary)" />
+          <Heart size={32} fill="var(--primary)" color="var(--primary)" />
           <div>
             <h1 style={{ fontSize: '1rem', lineHeight: '1.2' }}>Gestor de Plantões Santa Casa Bh</h1>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Logado como: {user?.nome?.split(' ')[0]}</span>
