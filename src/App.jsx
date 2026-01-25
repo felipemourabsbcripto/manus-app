@@ -58,7 +58,7 @@ const AppLayout = () => {
     <div className="app-container">
       <nav className="sidebar">
         <div className="logo">
-          <Calendar size={32} className="text-primary" />
+          <Star size={32} fill="var(--primary)" color="var(--primary)" />
           <div>
             <h1 style={{ fontSize: '1rem', lineHeight: '1.2' }}>Gestor de Plantões Santa Casa Bh</h1>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Logado como: {user?.nome?.split(' ')[0]}</span>
