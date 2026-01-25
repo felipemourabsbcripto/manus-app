@@ -64,7 +64,7 @@ app.get('/api/funcionarios/:id', (req, res) => {
 app.post('/api/funcionarios', (req, res) => {
   const { nome, email, senha, telefone, whatsapp: whatsappNum, cargo, especialidade, crm, tipo, gestor_id, salario_hora } = req.body;
   const id = uuidv4();
-  const senhaFinal = senha || 'manus123'; // Senha padrão se não informada
+  const senhaFinal = senha || 'santacasa123'; // Senha padrão se não informada
 
   db.prepare(`
     INSERT INTO funcionarios (id, nome, email, senha, telefone, whatsapp, cargo, especialidade, crm, tipo, gestor_id, salario_hora) 

@@ -62,7 +62,7 @@ export default function Login() {
                         background: 'linear-gradient(135deg, #fff 0%, #94a3b8 100%)',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent'
-                    }}>Manus App</h1>
+                    }}>Gestor de Plantões Santa Casa Bh</h1>
                     <p style={{ color: 'var(--text-secondary)' }}>Gestão Inteligente de Escalas</p>
                 </div>
 
@@ -133,7 +133,7 @@ export default function Login() {
                     fontSize: '0.75rem',
                     color: 'var(--secondary)'
                 }}>
-                    &copy; {new Date().getFullYear()} Manus App. Todos os direitos reservados.
+                    &copy; {new Date().getFullYear()} Gestor de Plantões Santa Casa Bh. Todos os direitos reservados.
                 </div>
             </div>
         </div>

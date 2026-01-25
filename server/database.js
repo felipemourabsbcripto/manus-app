@@ -36,14 +36,14 @@ try {
 }
 
 // Criar usuário Admin padrão se não existir nenhum funcionário
-const adminExiste = db.prepare("SELECT COUNT(*) as count FROM funcionarios WHERE email = 'admin@manus.com'").get();
+const adminExiste = db.prepare("SELECT COUNT(*) as count FROM funcionarios WHERE email = 'admin@santacasabh.com.br'").get();
 if (adminExiste.count === 0) {
   // Senha padrão:admin123 (em um app real, use hash/salt)
   const adminId = uuidv4();
   db.prepare(`
       INSERT INTO funcionarios(id, nome, email, senha, tipo, cargo) 
       VALUES(?, ?, ?, ?, ?, ?)
-    `).run(adminId, 'Administrador', 'admin@manus.com', 'admin123', 'admin', 'Administrador do Sistema');
+    `).run(adminId, 'Administrador', 'admin@santacasabh.com.br', 'santacasa123', 'admin', 'Administrador do Sistema');
 }
 
 
