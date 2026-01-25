@@ -16,6 +16,7 @@ import Configuracoes from './pages/Configuracoes';
 import WhatsApp from './pages/WhatsApp';
 import CheckIn from './pages/CheckIn';
 import Relatorios from './pages/Relatorios';
+import Register from './pages/Register';
 import Login from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { API_URL } from './config';
@@ -59,8 +60,8 @@ const AppLayout = () => {
         <div className="logo">
           <Calendar size={32} className="text-primary" />
           <div>
-            <h1 style={{ fontSize: '1.2rem', lineHeight: '1.2' }}>Gestor de Plantões Santa Casa Bh</h1>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{user?.nome?.split(' ')[0]}</span>
+            <h1 style={{ fontSize: '1rem', lineHeight: '1.2' }}>Gestor de Plantões Santa Casa Bh</h1>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Logado como: {user?.nome?.split(' ')[0]}</span>
           </div>
         </div>
         <ul className="nav-menu">
@@ -162,6 +163,7 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
           <Route element={<PrivateRoute />}>
             <Route element={<AppLayout />}>

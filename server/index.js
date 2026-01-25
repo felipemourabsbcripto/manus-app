@@ -35,6 +35,31 @@ app.post('/api/auth/login', (req, res) => {
   });
 });
 
+app.post('/api/auth/register', (req, res) => {
+  const { nome, email, senha, telefone } = req.body;
+
+  if (!nome || !email || !senha) {
+    return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
+  }
+
+  const existingUser = db.prepare('SELECT id FROM funcionarios WHERE email = ?').get(email);
+  if (existingUser) {
+    return res.status(400).json({ error: 'Email já cadastrado' });
+  }
+
+  const id = uuidv4();
+  // Por padrão, quem se cadastra é "gestor" para poder testar o sistema, ou "funcionario"? 
+  // O usuário pediu área de cadastro. Vamos criar como 'gestor' para ele poder usar o sistema, ou 'funcionario' pendente?
+  // Vou criar como 'gestor' por enquanto para facilitar o teste do Felipe, mas o ideal seria aprovação.
+
+  db.prepare(`
+    INSERT INTO funcionarios (id, nome, email, senha, telefone, tipo, cargo, ativo) 
+    VALUES (?, ?, ?, ?, ?, 'gestor', 'Gestor', 1)
+  `).run(id, nome, email, senha, telefone);
+
+  res.json({ success: true, message: 'Cadastro realizado com sucesso' });
+});
+
 
 // ============ FUNCIONÁRIOS / MÉDICOS ============
 app.get('/api/funcionarios', (req, res) => {

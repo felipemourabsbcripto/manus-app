@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Lock, Mail, ChevronRight, Loader2, Hospital } from 'lucide-react';
 
 export default function Login() {
@@ -126,6 +126,37 @@ export default function Login() {
                         )}
                     </button>
                 </form>
+
+                <div style={{ display: 'flex', alignItems: 'center', margin: '1.5rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+                    <span style={{ padding: '0 1rem' }}>ou entre com</span>
+                    <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <button
+                        type="button"
+                        className="btn"
+                        style={{ background: 'white', color: '#333', justifyContent: 'center', gap: '0.5rem', fontSize: '0.875rem' }}
+                        onClick={() => alert('Integração com Google em breve')}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M24 12.27c0-.85-.07-1.68-.21-2.48H12v4.69h6.73c-.29 1.57-1.17 2.9-2.51 3.79v3.15h4.06c2.37-2.19 3.73-5.41 3.73-9.15z" /><path fill="#FBBC05" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-4.06-3.15c-1.13.75-2.57 1.2-3.87 1.2-2.98 0-5.5-2.02-6.4-4.73H1.41v3.31C3.39 21.65 7.42 24 12 24z" /><path fill="#34A853" d="M5.6 14.41c-.24-.71-.37-1.46-.37-2.41s.13-1.7.37-2.41V6.29H1.41C.51 8.08 0 10.01 0 12s.51 3.92 1.41 5.71l4.19-3.3z" /><path fill="#4285F4" d="M12 4.77c1.76 0 3.35.6 4.6 1.8l3.44-3.44C17.94 1.13 15.23 0 12 0 7.42 0 3.39 2.35 1.41 6.29l4.19 3.3c.9-2.71 3.42-4.73 6.4-4.73z" /></svg>
+                        Google
+                    </button>
+                    <button
+                        type="button"
+                        className="btn"
+                        style={{ background: '#0067b8', color: 'white', justifyContent: 'center', gap: '0.5rem', fontSize: '0.875rem' }}
+                        onClick={() => alert('Integração com Microsoft em breve')}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 23 23"><path fill="#f3f3f3" d="M0 0h11v11H0z" /><path fill="#f3f3f3" d="M12 0h11v11H12z" /><path fill="#f3f3f3" d="M0 12h11v11H0z" /><path fill="#f3f3f3" d="M12 12h11v11H12z" /></svg>
+                        Microsoft
+                    </button>
+                </div>
+
+                <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    Não tem uma conta? <Link to="/register" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>Cadastre-se</Link>
+                </div>
 
                 <div style={{
                     marginTop: '2rem',

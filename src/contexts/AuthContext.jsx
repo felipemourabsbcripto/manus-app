@@ -45,6 +45,32 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const register = async (userData) => {
+        try {
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Auto login after register? Or redirect to login? 
+                // Let's just return success and let the component handle it (e.g. login automatically or show success message)
+                // For better UX, let's login automatically.
+                return login(userData.email, userData.senha);
+            } else {
+                return { success: false, error: data.error };
+            }
+        } catch (error) {
+            console.error('Erro no cadastro:', error);
+            return { success: false, error: 'Erro ao conectar ao servidor' };
+        }
+    };
+
     const logout = () => {
         setUser(null);
         localStorage.removeItem('@ManusApp:user');
@@ -57,7 +83,8 @@ export const AuthProvider = ({ children }) => {
             signed: !!user,
             loading,
             login,
-            logout
+            logout,
+            register
         }}>
             {children}
         </AuthContext.Provider>
