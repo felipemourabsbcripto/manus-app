@@ -6,7 +6,15 @@ const db = new Database(path.join(__dirname, 'escala.db'));
 
 // Criar tabelas
 db.exec(`
-  -- Funcionários (agora com campos para médicos)
+  -- Unidades
+  CREATE TABLE IF NOT EXISTS unidades (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    endereco TEXT,
+    ativo INTEGER DEFAULT 1
+  );
+
+  -- Funcionários (agora com campos para médicos e unidade)
   CREATE TABLE IF NOT EXISTS funcionarios (
     id TEXT PRIMARY KEY,
     nome TEXT NOT NULL,
@@ -21,9 +29,11 @@ db.exec(`
     gestor_id TEXT,
     salario_hora REAL DEFAULT 0,
     ativo INTEGER DEFAULT 1,
+    unidade_id TEXT,
     foto_url TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (gestor_id) REFERENCES funcionarios(id)
+    FOREIGN KEY (gestor_id) REFERENCES funcionarios(id),
+    FOREIGN KEY (unidade_id) REFERENCES unidades(id)
   );
 `);
 
@@ -337,9 +347,32 @@ const configPadrao = [
 const insertConfig = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
 configPadrao.forEach(([chave, valor]) => insertConfig.run(chave, valor));
 
+// Inserir unidades institucionais se não existirem
+const countUnidades = db.prepare("SELECT COUNT(*) as count FROM unidades").get();
+if (countUnidades && countUnidades.count === 0) {
+  const { v4: uuidv4 } = require('uuid');
+  const unidades = [
+    'Hospital Santa Casa BH',
+    'Hospital São Lucas',
+    'Unidade de Oncologia SCBH',
+    'Faculdade de Saúde SCBH',
+    'ÓrixLab',
+    'Instituto Geriátrico',
+    'Assistência Familiar SCBH',
+    'Instituto de Educação e Pesquisa',
+    'Centro de Especialidades Médicas',
+    'Unidade de Transplantes'
+  ];
+  const stmt = db.prepare("INSERT INTO unidades (id, nome) VALUES (?, ?)");
+  unidades.forEach(nome => stmt.run(uuidv4(), nome));
+}
+
 // Inserir hospital padrão
 const hospitalExiste = db.prepare('SELECT COUNT(*) as count FROM hospitais').get();
 if (hospitalExiste.count === 0) {
+  // Assuming uuidv4 is defined globally or imported elsewhere if not in the above block
+  // If uuidv4 is only defined within the 'unidades' block, it needs to be moved to a higher scope
+  // For now, keeping it as per the instruction's context.
   db.prepare(`
     INSERT INTO hospitais (id, nome, endereco, latitude, longitude, raio_metros) 
     VALUES (?, ?, ?, ?, ?, ?)

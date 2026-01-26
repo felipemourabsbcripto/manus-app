@@ -61,8 +61,7 @@ const ESPECIALIDADES = [
 ];
 
 function Funcionarios() {
-  const [funcionarios, setFuncionarios] = useState([]);
-  const [gestores, setGestores] = useState([]);
+  const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -78,13 +77,25 @@ function Funcionarios() {
     crm: '',
     tipo: 'medico',
     gestor_id: '',
+    unidade_id: '',
     salario_hora: ''
   });
 
   useEffect(() => {
     fetchFuncionarios();
     fetchGestores();
+    fetchUnidades();
   }, [filtroTipo]);
+
+  const fetchUnidades = async () => {
+    try {
+      const res = await fetch(`${API_URL}/unidades`);
+      const data = await res.json();
+      setUnidades(data);
+    } catch (error) {
+      console.error('Erro ao buscar unidades:', error);
+    }
+  };
 
   const fetchFuncionarios = async () => {
     try {
@@ -111,7 +122,7 @@ function Funcionarios() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validações para médico
     if (form.tipo === 'medico') {
       if (!form.nome || !form.crm || !form.especialidade || !form.whatsapp) {
@@ -119,7 +130,7 @@ function Funcionarios() {
         return;
       }
     }
-    
+
     try {
       if (editando) {
         await fetch(`${API_URL}/funcionarios/${editando}`, {
@@ -155,6 +166,7 @@ function Funcionarios() {
       crm: '',
       tipo: 'medico',
       gestor_id: '',
+      unidade_id: '',
       salario_hora: ''
     });
   };
@@ -170,6 +182,7 @@ function Funcionarios() {
       crm: funcionario.crm || '',
       tipo: funcionario.tipo || 'medico',
       gestor_id: funcionario.gestor_id || '',
+      unidade_id: funcionario.unidade_id || '',
       salario_hora: funcionario.salario_hora || ''
     });
     setEditando(funcionario.id);
@@ -279,6 +292,7 @@ function Funcionarios() {
                   <th>CRM</th>
                   <th>Especialidade</th>
                   <th>WhatsApp</th>
+                  <th>Unidade</th>
                   <th>Email</th>
                   <th>Gestor</th>
                   <th>Ações</th>
@@ -311,14 +325,10 @@ function Funcionarios() {
                       )}
                     </td>
                     <td>
-                      {funcionario.email && (
-                        <div className="flex items-center gap-1 text-sm text-secondary">
-                          <Mail size={14} />
-                          {funcionario.email}
-                        </div>
-                      )}
+                      <span className="badge badge-info">
+                        {unidades.find(u => u.id === funcionario.unidade_id)?.nome || 'Santa Casa BH'}
+                      </span>
                     </td>
-                    <td>{getGestorNome(funcionario.gestor_id)}</td>
                     <td>
                       <div className="action-buttons">
                         <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(funcionario)}>
@@ -358,7 +368,7 @@ function Funcionarios() {
                 <X size={24} />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit}>
               {/* Tipo de cadastro */}
               <div className="form-group">
@@ -474,16 +484,31 @@ function Funcionarios() {
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label">Valor/Hora (R$)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="form-input"
-                        value={form.salario_hora}
-                        onChange={e => setForm({ ...form, salario_hora: e.target.value })}
-                        placeholder="0.00"
-                      />
+                      <label className="form-label">Unidade Santa Casa BH *</label>
+                      <select
+                        className="form-select"
+                        value={form.unidade_id}
+                        onChange={e => setForm({ ...form, unidade_id: e.target.value })}
+                        required
+                      >
+                        <option value="">Selecione a unidade...</option>
+                        {unidades.map(u => (
+                          <option key={u.id} value={u.id}>{u.nome}</option>
+                        ))}
+                      </select>
                     </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Valor/Hora (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-input"
+                      value={form.salario_hora}
+                      onChange={e => setForm({ ...form, salario_hora: e.target.value })}
+                      placeholder="0.00"
+                    />
                   </div>
                 </>
               )}
@@ -546,7 +571,7 @@ function Funcionarios() {
                   </div>
                 </>
               )}
-              
+
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
                   Cancelar

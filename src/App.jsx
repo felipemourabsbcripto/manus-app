@@ -58,94 +58,85 @@ const AppLayout = () => {
     <div className="app-container">
       <nav className="sidebar">
         <div className="logo">
-          <Heart size={32} fill="var(--primary)" color="var(--primary)" />
+          <div className="logo-icon">
+            <Heart size={24} fill="white" color="white" />
+          </div>
           <div>
-            <h1 style={{ fontSize: '1rem', lineHeight: '1.2' }}>Gestor de Plantões Santa Casa Bh</h1>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Logado como: {user?.nome?.split(' ')[0]}</span>
+            <h1>Santa Casa BH</h1>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>GESTÃO DE PLANTÕES</span>
           </div>
         </div>
-        <ul className="nav-menu">
-          <li>
-            <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <LayoutDashboard size={20} />
-              <span>Dashboard</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/funcionarios" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <Users size={20} />
-              <span>Funcionários</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/escalas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <Calendar size={20} />
-              <span>Escalas</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/checkin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <MapPin size={20} />
-              <span>Check-in/out</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/presencas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <Clock size={20} />
-              <span>Presenças</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/furos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <AlertTriangle size={20} />
-              <span>Furos</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/whatsapp" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <MessageSquare size={20} />
-              <span>WhatsApp</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/notas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <Star size={20} />
-              <span>Notas</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/pagamentos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <DollarSign size={20} />
-              <span>Pagamentos</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/relatorios" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <FileText size={20} />
-              <span>Relatórios</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/avisos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <div className="notification-badge">
-                <Bell size={20} />
-                {avisosNaoLidos > 0 && <span className="notification-count">{avisosNaoLidos}</span>}
-              </div>
-              <span>Avisos</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/configuracoes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-              <Settings size={20} />
-              <span>Configurações</span>
-            </NavLink>
-          </li>
-        </ul>
 
-        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-          <div onClick={logout} className="nav-item" style={{ color: 'var(--danger)' }}>
-            <LogOut size={20} />
-            <span>Sair</span>
+        <div className="nav-menu">
+          <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <LayoutDashboard />
+            <span>Dashboard</span>
+          </NavLink>
+
+          <NavLink to="/escalas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Calendar />
+            <span>Escalas</span>
+          </NavLink>
+
+          <NavLink to="/funcionarios" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Users />
+            <span>Médicos e Equipe</span>
+          </NavLink>
+
+          <NavLink to="/presencas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Clock />
+            <span>Presenças</span>
+          </NavLink>
+
+          <NavLink to="/furos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <AlertTriangle />
+            <span>Furos e Faltas</span>
+          </NavLink>
+
+          <NavLink to="/pagamentos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <DollarSign />
+            <span>Pagamentos</span>
+          </NavLink>
+
+          <NavLink to="/avisos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Bell />
+            <span>Avisos</span>
+          </NavLink>
+
+          <NavLink to="/whatsapp" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <MessageSquare />
+            <span>Comunicação</span>
+          </NavLink>
+
+          <NavLink to="/relatorios" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <FileText />
+            <span>Relatórios</span>
+          </NavLink>
+
+          <NavLink to="/configuracoes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Settings />
+            <span>Configurações</span>
+          </NavLink>
+
+          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{
+              padding: '1rem',
+              background: 'rgba(255,255,255,0.03)',
+              borderRadius: '1rem',
+              marginBottom: '1rem',
+              border: '1px solid var(--border)'
+            }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white' }}>{user?.nome}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)' }}></div>
+                {user?.tipo?.toUpperCase()}
+              </div>
+            </div>
+
+            <button onClick={logout} className="nav-item" style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', padding: '0.75rem' }}>
+              <LogOut size={20} color="var(--danger)" />
+              <span style={{ color: 'var(--danger)' }}>Sair do Sistema</span>
+            </button>
           </div>
         </div>
       </nav>

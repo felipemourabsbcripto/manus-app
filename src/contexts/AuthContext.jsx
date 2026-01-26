@@ -17,6 +17,33 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
+    const loginSocial = async ({ provider, profile }) => {
+        try {
+            const response = await fetch('/api/auth/social-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    provider,
+                    email: profile.email,
+                    nome: profile.name,
+                    photo: profile.picture
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setUser(data.user);
+                localStorage.setItem('@ManusApp:user', JSON.stringify(data.user));
+                localStorage.setItem('@ManusApp:token', data.token);
+                return { success: true };
+            }
+            return { success: false, error: data.error };
+        } catch (error) {
+            return { success: false, error: 'Erro no login social' };
+        }
+    };
+
     const login = async (email, senha) => {
         try {
             // Em desenvolvimento, a URL pode variar, então tente usar config ou relativo se tiver proxy
@@ -83,6 +110,7 @@ export const AuthProvider = ({ children }) => {
             signed: !!user,
             loading,
             login,
+            loginSocial,
             logout,
             register
         }}>

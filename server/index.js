@@ -61,6 +61,39 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 
+app.post('/api/auth/social-login', async (req, res) => {
+  const { provider, token, email, nome, photo } = req.body;
+
+  if (!email || !provider) {
+    return res.status(400).json({ error: 'Dados insuficientes para login social' });
+  }
+
+  // Verificar se o usuário existe
+  let usuario = db.prepare('SELECT * FROM funcionarios WHERE email = ?').get(email);
+
+  if (!usuario) {
+    // Cadastro automático via Social Login
+    const id = uuidv4();
+    db.prepare(`
+      INSERT INTO funcionarios (id, nome, email, tipo, cargo, ativo, foto_url) 
+      VALUES (?, ?, ?, 'gestor', 'Gestor (Social)', 1, ?)
+    `).run(id, nome || email.split('@')[0], email, photo || '');
+
+    usuario = db.prepare('SELECT * FROM funcionarios WHERE id = ?').get(id);
+  } else if (usuario.ativo === 0) {
+    return res.status(401).json({ error: 'Usuário desativado' });
+  }
+
+  const { senha: _, ...usuarioSemSenha } = usuario;
+
+  res.json({
+    success: true,
+    user: usuarioSemSenha,
+    token: 'social-token-' + uuidv4()
+  });
+});
+
+
 // ============ FUNCIONÁRIOS / MÉDICOS ============
 app.get('/api/funcionarios', (req, res) => {
   const { tipo, gestor_id } = req.query;
@@ -87,25 +120,25 @@ app.get('/api/funcionarios/:id', (req, res) => {
 });
 
 app.post('/api/funcionarios', (req, res) => {
-  const { nome, email, senha, telefone, whatsapp: whatsappNum, cargo, especialidade, crm, tipo, gestor_id, salario_hora } = req.body;
+  const { nome, email, senha, telefone, whatsapp: whatsappNum, cargo, especialidade, crm, tipo, gestor_id, salario_hora, unidade_id } = req.body;
   const id = uuidv4();
   const senhaFinal = senha || 'santacasa123'; // Senha padrão se não informada
 
   db.prepare(`
-    INSERT INTO funcionarios (id, nome, email, senha, telefone, whatsapp, cargo, especialidade, crm, tipo, gestor_id, salario_hora) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, nome, email, senhaFinal, telefone, whatsappNum || telefone, cargo, especialidade, crm, tipo || 'medico', gestor_id, salario_hora || 0);
+    INSERT INTO funcionarios (id, nome, email, senha, telefone, whatsapp, cargo, especialidade, crm, tipo, gestor_id, salario_hora, unidade_id) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, nome, email, senhaFinal, telefone, whatsappNum || telefone, cargo, especialidade, crm, tipo || 'medico', gestor_id, salario_hora || 0, unidade_id);
 
-  res.json({ id, nome, email, telefone, whatsapp: whatsappNum, cargo, especialidade, crm, tipo, gestor_id, salario_hora });
+  res.json({ id, nome, email, telefone, whatsapp: whatsappNum, cargo, especialidade, crm, tipo, gestor_id, salario_hora, unidade_id });
 });
 
 app.put('/api/funcionarios/:id', (req, res) => {
-  const { nome, email, telefone, whatsapp: whatsappNum, cargo, especialidade, crm, tipo, gestor_id, salario_hora } = req.body;
+  const { nome, email, telefone, whatsapp: whatsappNum, cargo, especialidade, crm, tipo, gestor_id, salario_hora, unidade_id } = req.body;
   db.prepare(`
     UPDATE funcionarios 
-    SET nome = ?, email = ?, telefone = ?, whatsapp = ?, cargo = ?, especialidade = ?, crm = ?, tipo = ?, gestor_id = ?, salario_hora = ?
+    SET nome = ?, email = ?, telefone = ?, whatsapp = ?, cargo = ?, especialidade = ?, crm = ?, tipo = ?, gestor_id = ?, salario_hora = ?, unidade_id = ?
     WHERE id = ?
-  `).run(nome, email, telefone, whatsappNum || telefone, cargo, especialidade, crm, tipo, gestor_id, salario_hora, req.params.id);
+  `).run(nome, email, telefone, whatsappNum || telefone, cargo, especialidade, crm, tipo, gestor_id, salario_hora, unidade_id, req.params.id);
   res.json({ success: true });
 });
 
@@ -1130,6 +1163,11 @@ setInterval(async () => {
   }
 }, 60000);
 
+app.get('/api/unidades', (req, res) => {
+  const unidades = db.prepare('SELECT * FROM unidades WHERE ativo = 1 ORDER BY nome').all();
+  res.json(unidades);
+});
+
 // Servir arquivos estáticos do React em produção
 app.use(express.static(path.join(__dirname, '../dist')));
 
@@ -1137,7 +1175,6 @@ app.use(express.static(path.join(__dirname, '../dist')));
 app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
-
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
