@@ -3,35 +3,23 @@
  * CRM SCRAPER - Consulta Automatizada CFM
  * ============================================
  * 
- * Este módulo faz web scraping no portal do CFM para consultar
- * dados públicos de médicos. 
+ * Web scraping no portal do CFM para consultar dados públicos de médicos.
  * 
- * IMPORTANTE: 
- * - Use com moderação para não sobrecarregar o servidor do CFM
- * - Para uso em produção, considere contratar o Webservice oficial:
- *   https://sistemas.cfm.org.br/listamedicos/informacoes
- *   Custo: R$ 948,00/ano (empresas) | Gratuito (entidades públicas)
- * 
- * Dados disponíveis:
- * - Nome completo do médico
- * - Número do CRM
- * - Estado (UF)
- * - Tipo de inscrição
- * - Situação (Ativo/Inativo)
- * - Especialidades registradas
+ * IMPORTANTE PARA SANTA CASA BH:
+ * Como entidade filantrópica/pública, vocês podem solicitar acesso
+ * GRATUITO ao Webservice oficial do CFM:
+ * https://sistemas.cfm.org.br/listamedicos/informacoes
+ * Email: webservice@portalmedico.org.br | Tel: (61) 3770-3594
  */
 
 const puppeteer = require('puppeteer');
 
-// Cache em memória para evitar consultas repetidas
+// Cache em memória (24h)
 const cache = new Map();
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
+const CACHE_TTL = 24 * 60 * 60 * 1000;
 
 /**
- * Consulta CRM no portal do CFM usando Puppeteer
- * @param {string} crm - Número do CRM
- * @param {string} uf - UF do registro (ex: MG, SP, RJ)
- * @returns {Promise<Object>} Dados do médico
+ * Consulta CRM no portal do CFM
  */
 async function consultarCRM(crm, uf) {
   const cacheKey = `${crm}-${uf.toUpperCase()}`;
@@ -50,229 +38,195 @@ async function consultarCRM(crm, uf) {
 
   let browser;
   try {
-    // Iniciar navegador headless
     browser = await puppeteer.launch({
       headless: 'new',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
         '--disable-gpu',
-        '--window-size=1920x1080'
+        '--single-process'
       ]
     });
 
     const page = await browser.newPage();
     
-    // Configurar User-Agent para parecer um navegador real
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1366, height: 768 });
     
-    // Configurar timeout
-    page.setDefaultTimeout(30000);
+    // Timeout maior para o site do CFM
+    page.setDefaultTimeout(60000);
     
-    // Acessar página de busca
+    console.log('📄 Acessando portal CFM...');
     await page.goto('https://portal.cfm.org.br/busca-medicos/', {
-      waitUntil: 'networkidle2'
+      waitUntil: 'domcontentloaded',
+      timeout: 60000
     });
 
-    // Aguardar formulário carregar
-    await page.waitForSelector('#buscaForm', { timeout: 10000 });
-
-    // Preencher campos do formulário
-    // Campo CRM
-    await page.type('input[name="crm"]', crm.toString());
+    // Aguardar página
+    await new Promise(r => setTimeout(r, 3000));
     
-    // Campo UF (select)
-    await page.select('select[name="uf"]', uf.toUpperCase());
-
-    // Clicar em Enviar
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle2' }),
-      page.click('button[type="submit"], input[type="submit"]')
-    ]).catch(() => {
-      // Algumas vezes não há navegação, só atualização de conteúdo
-    });
-
-    // Aguardar resultados
-    await page.waitForTimeout(2000);
-
-    // Extrair dados da página de resultados
-    const resultado = await page.evaluate(() => {
-      // Procurar tabela de resultados ou card com dados
-      const rows = document.querySelectorAll('.resultado-busca tr, .card-medico, .medico-info');
-      
-      if (rows.length === 0) {
-        // Verificar se há mensagem de "não encontrado"
-        const noResult = document.querySelector('.no-result, .sem-resultado, .alert-warning');
-        if (noResult) {
-          return { encontrado: false, mensagem: noResult.textContent.trim() };
-        }
-        return { encontrado: false, mensagem: 'Médico não encontrado' };
-      }
-
-      // Tentar extrair dados de diferentes formatos possíveis
-      const extrairTexto = (seletor) => {
-        const el = document.querySelector(seletor);
-        return el ? el.textContent.trim() : null;
-      };
-
-      // Formato 1: Tabela
-      const dados = {};
-      document.querySelectorAll('table tr').forEach(row => {
-        const cells = row.querySelectorAll('td, th');
-        if (cells.length >= 2) {
-          const label = cells[0].textContent.trim().toLowerCase();
-          const value = cells[1].textContent.trim();
-          
-          if (label.includes('nome')) dados.nome = value;
-          if (label.includes('crm')) dados.crm = value;
-          if (label.includes('uf') || label.includes('estado')) dados.uf = value;
-          if (label.includes('situação') || label.includes('situacao')) dados.situacao = value;
-          if (label.includes('inscrição') || label.includes('inscricao')) dados.tipoInscricao = value;
-          if (label.includes('especialidade')) dados.especialidade = value;
-        }
-      });
-
-      // Formato 2: Divs com labels
-      document.querySelectorAll('.field, .campo, [class*="resultado"]').forEach(field => {
-        const text = field.textContent;
-        if (text.includes('Nome:')) dados.nome = text.split('Nome:')[1]?.split('\n')[0]?.trim();
-        if (text.includes('CRM:')) dados.crm = text.split('CRM:')[1]?.split('\n')[0]?.trim();
-        if (text.includes('Situação:')) dados.situacao = text.split('Situação:')[1]?.split('\n')[0]?.trim();
-      });
-
-      if (Object.keys(dados).length > 0) {
-        return { encontrado: true, ...dados };
-      }
-
-      // Capturar HTML para debug se necessário
-      return { 
-        encontrado: false, 
-        mensagem: 'Formato de resposta não reconhecido',
-        debug: document.body.innerHTML.substring(0, 500)
-      };
-    });
-
-    // Salvar no cache se encontrou
-    if (resultado.encontrado) {
-      cache.set(cacheKey, {
-        timestamp: Date.now(),
-        data: resultado
-      });
+    console.log('📝 Preenchendo formulário...');
+    
+    // Preencher UF
+    const ufSelect = await page.$('select[name="uf"], select#uf, #inscricao, [name="estado"]');
+    if (ufSelect) {
+      await page.select('select[name="uf"], select#uf, #inscricao, [name="estado"]', uf.toUpperCase()).catch(() => {});
     }
-
-    console.log(`✅ Consulta CRM ${crm}/${uf} concluída:`, resultado.encontrado ? 'Encontrado' : 'Não encontrado');
-    return resultado;
-
+    
+    // Preencher CRM
+    const crmInput = await page.$('input[name="crm"], input#crm, #num-inscricao, [name="numero"]');
+    if (crmInput) {
+      await crmInput.type(crm.toString(), { delay: 50 });
+    }
+    
+    await new Promise(r => setTimeout(r, 1000));
+    
+    // Clicar no botão de busca
+    console.log('🔎 Buscando...');
+    const searchBtn = await page.$('button[type="submit"], input[type="submit"], .btn-buscar, #btn-pesquisar');
+    if (searchBtn) {
+      await searchBtn.click();
+    }
+    
+    // Aguardar resultado
+    await new Promise(r => setTimeout(r, 5000));
+    
+    // Extrair dados
+    console.log('📊 Extraindo dados...');
+    const resultado = await page.evaluate(() => {
+      // Buscar dados em tabela ou cards de resultado
+      const getText = (selectors) => {
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim()) return el.textContent.trim();
+        }
+        return '';
+      };
+      
+      // Tentar diferentes estruturas de resultado
+      const nome = getText([
+        '.resultado-nome', '.nome-medico', 'td:nth-child(1)', 
+        '.card-title', 'h2.nome', '[data-nome]'
+      ]);
+      
+      const situacao = getText([
+        '.resultado-situacao', '.situacao', 'td:nth-child(4)',
+        '.status', '[data-situacao]'
+      ]);
+      
+      const especialidade = getText([
+        '.resultado-especialidade', '.especialidade', 'td:nth-child(3)',
+        '.especializacao', '[data-especialidade]'
+      ]);
+      
+      // Verificar se encontrou dados
+      const pageText = document.body.innerText.toLowerCase();
+      const naoEncontrado = pageText.includes('não encontrado') || 
+                           pageText.includes('nenhum resultado') ||
+                           pageText.includes('sem resultado');
+      
+      return {
+        nome: nome || '',
+        situacao: situacao || '',
+        especialidade: especialidade || '',
+        naoEncontrado,
+        pageContent: document.body.innerText.substring(0, 2000)
+      };
+    });
+    
+    await browser.close();
+    
+    // Processar resultado
+    if (resultado.naoEncontrado || !resultado.nome) {
+      // Tentar extrair do conteúdo da página
+      const pageContent = resultado.pageContent || '';
+      
+      // Regex para encontrar dados
+      const nomeMatch = pageContent.match(/Nome[:\s]+([A-Z][A-Za-z\s]+)/);
+      const situMatch = pageContent.match(/Situa[çc][ãa]o[:\s]+(\w+)/i);
+      
+      if (nomeMatch) {
+        const data = {
+          encontrado: true,
+          nome: nomeMatch[1].trim(),
+          crm,
+          uf: uf.toUpperCase(),
+          situacao: situMatch ? situMatch[1] : 'Não informado',
+          fonte: 'CFM Portal (scraping)'
+        };
+        
+        cache.set(cacheKey, { timestamp: Date.now(), data });
+        return data;
+      }
+      
+      return {
+        encontrado: false,
+        mensagem: `CRM ${crm}/${uf} não encontrado no portal CFM`
+      };
+    }
+    
+    const data = {
+      encontrado: true,
+      nome: resultado.nome,
+      crm,
+      uf: uf.toUpperCase(),
+      situacao: resultado.situacao || 'Não informado',
+      especialidade: resultado.especialidade || '',
+      fonte: 'CFM Portal (scraping)'
+    };
+    
+    cache.set(cacheKey, { timestamp: Date.now(), data });
+    console.log('✅ Dados obtidos:', data.nome);
+    return data;
+    
   } catch (error) {
-    console.error(`❌ Erro ao consultar CRM ${crm}/${uf}:`, error.message);
+    console.error('❌ Erro no scraper:', error.message);
+    
+    if (browser) {
+      try { await browser.close(); } catch {}
+    }
+    
+    // Retornar erro com sugestão
     return {
       encontrado: false,
       erro: true,
-      mensagem: `Erro na consulta: ${error.message}`
+      mensagem: `Erro ao consultar CFM: ${error.message}`,
+      sugestao: 'O portal CFM pode estar lento. Tente novamente ou use o modo MOCK para testes.'
     };
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
 }
 
-/**
- * Consulta CRM usando fetch direto (alternativa sem Puppeteer)
- * Tenta fazer requisição direta à API do CFM se disponível
- */
-async function consultarCRMFetch(crm, uf) {
-  const cacheKey = `${crm}-${uf.toUpperCase()}`;
-  
-  // Verificar cache
-  if (cache.has(cacheKey)) {
-    const cached = cache.get(cacheKey);
-    if (Date.now() - cached.timestamp < CACHE_TTL) {
-      return cached.data;
-    }
-  }
+// Alias para compatibilidade
+const consultar = consultarCRM;
 
-  try {
-    // Tentar endpoint de API interno do CFM (pode não funcionar)
-    const response = await fetch('https://portal.cfm.org.br/wp-admin/admin-ajax.php', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: new URLSearchParams({
-        action: 'busca_medicos',
-        crm: crm,
-        uf: uf.toUpperCase()
-      })
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.success) {
-        const resultado = {
-          encontrado: true,
-          ...data.data
-        };
-        cache.set(cacheKey, { timestamp: Date.now(), data: resultado });
-        return resultado;
-      }
-    }
-  } catch (error) {
-    // Se fetch falhar, retorna null para tentar Puppeteer
-  }
-
-  return null;
-}
-
-/**
- * Função principal de consulta - tenta fetch primeiro, depois Puppeteer
- */
-async function consultar(crm, uf) {
-  // Validar inputs
-  if (!crm || !uf) {
-    return { encontrado: false, erro: true, mensagem: 'CRM e UF são obrigatórios' };
-  }
-
-  // Normalizar
-  crm = crm.toString().replace(/\D/g, '');
-  uf = uf.toUpperCase().trim();
-
-  // Validar UF
-  const ufsValidas = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
-  if (!ufsValidas.includes(uf)) {
-    return { encontrado: false, erro: true, mensagem: `UF inválida: ${uf}` };
-  }
-
-  // Tentar fetch rápido primeiro
-  const resultadoFetch = await consultarCRMFetch(crm, uf);
-  if (resultadoFetch) {
-    return resultadoFetch;
-  }
-
-  // Fallback para Puppeteer (web scraping)
-  return consultarCRM(crm, uf);
-}
-
-/**
- * Limpar cache
- */
+// Limpar cache
 function limparCache() {
+  const count = cache.size;
   cache.clear();
-  console.log('🗑️ Cache de CRM limpo');
+  console.log(`🗑️ Cache limpo. ${count} entradas removidas.`);
+  return count;
 }
 
-/**
- * Estatísticas do cache
- */
+// Estatísticas do cache
 function estatisticasCache() {
+  const agora = Date.now();
+  let validos = 0;
+  let expirados = 0;
+  
+  for (const [key, value] of cache.entries()) {
+    if (agora - value.timestamp < CACHE_TTL) {
+      validos++;
+    } else {
+      expirados++;
+      cache.delete(key);
+    }
+  }
+  
   return {
-    tamanho: cache.size,
-    chaves: Array.from(cache.keys())
+    total: validos,
+    expiradosRemovidos: expirados,
+    ttlHoras: CACHE_TTL / (60 * 60 * 1000)
   };
 }
 

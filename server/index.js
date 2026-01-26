@@ -267,12 +267,16 @@ app.post('/api/auth/apple/callback', async (req, res) => {
 
 // ============ CONSULTA CRM ============
 // Modos disponíveis:
-//   - MOCK: Simulação local (padrão para testes)
-//   - SCRAPER: Web scraping automático do portal CFM (gratuito)
-//   - WEBSERVICE: API oficial do CFM (R$ 948/ano para empresas)
+//   - MOCK: Simulação local (padrão para desenvolvimento)
+//   - SCRAPER: Web scraping automático do portal CFM (experimental)
+//   - WEBSERVICE: API oficial do CFM (R$ 948/ano para empresas, GRATUITO para hospitais públicos)
 //   - CONSULTARIO: Consultar.io (pago por consulta)
+//
+// RECOMENDAÇÃO PARA SANTA CASA BH:
+// Como entidade filantrópica, solicite acesso GRATUITO ao Webservice CFM:
+// https://sistemas.cfm.org.br/listamedicos/informacoes
+// Email: webservice@portalmedico.org.br | Tel: (61) 3770-3594
 
-const CRM_MODE = process.env.CRM_MODE || 'MOCK'; // MOCK | SCRAPER | WEBSERVICE | CONSULTARIO
 const CONSULTARIO_API_KEY = process.env.CONSULTARIO_KEY || '';
 const CFM_WEBSERVICE_KEY = process.env.CFM_WEBSERVICE_KEY || '';
 
@@ -288,6 +292,9 @@ const getCrmScraper = () => {
   }
   return crmScraper;
 };
+
+// Estado mutável do modo CRM (pode ser alterado em runtime)
+let currentCrmMode = process.env.CRM_MODE || 'MOCK';
 
 app.get('/api/crm/consulta', async (req, res) => {
   const { crm, uf } = req.query;
@@ -417,9 +424,6 @@ app.get('/api/crm/consulta', async (req, res) => {
 });
 
 // ============ CRM - CONFIGURAÇÃO E STATUS ============
-// Estado mutável do modo CRM (pode ser alterado em runtime)
-let currentCrmMode = process.env.CRM_MODE || 'MOCK';
-
 app.get('/api/crm/config', (req, res) => {
   const scraper = getCrmScraper();
   
