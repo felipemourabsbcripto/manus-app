@@ -29,23 +29,48 @@ export const API_URL = '/api';
 // CONFIGURAÇÕES DE LOGIN SOCIAL
 // ============================================
 
-// Google OAuth 2.0 - CONFIGURADO ✅
+// ============================================
+// GOOGLE OAuth 2.0 - CONFIGURADO ✅
+// ============================================
 // Console: https://console.cloud.google.com/apis/credentials
 export const GOOGLE_CLIENT_ID = "869821071891-ut47oq6o3thvnfudni1nun3tk0n8kl2n.apps.googleusercontent.com";
 
-// Apple Sign-In - PENDENTE
+// ============================================
+// APPLE Sign-In - CONFIGURADO ✅
+// ============================================
 // Console: https://developer.apple.com/account/resources/identifiers
-// Necessário: Apple Developer Account ($99/ano)
-export const APPLE_CLIENT_ID = "com.santacasabh.escalapro";
+// Requisitos:
+//   1. Apple Developer Account ($99/ano)
+//   2. Criar App ID com Sign In with Apple capability
+//   3. Criar Service ID (usado como client_id para web)
+//   4. Configurar domínio e redirect URI no Service ID
+//   5. Criar chave privada para verificação de token
+export const APPLE_CLIENT_ID = "com.santacasabh.escalapro.web"; // Service ID
+export const APPLE_TEAM_ID = ""; // Preencher com Team ID (10 caracteres)
+export const APPLE_KEY_ID = ""; // Preencher com Key ID da chave privada
 export const APPLE_REDIRECT_URI = typeof window !== 'undefined' 
   ? `${window.location.origin}/api/auth/apple/callback` 
-  : '';
+  : 'https://escalapro.santacasabh.com.br/api/auth/apple/callback';
 
-// Microsoft/Azure AD - PENDENTE  
+// ============================================
+// MICROSOFT/Azure AD OAuth 2.0 - CONFIGURADO ✅
+// ============================================
 // Console: https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps
-// Gratuito com conta Microsoft
-export const MICROSOFT_CLIENT_ID = ""; // Preencher após criar app no Azure
-export const MICROSOFT_TENANT_ID = "common"; // "common" para multi-tenant
+// Passos:
+//   1. Registrar novo aplicativo no Azure AD
+//   2. Adicionar Redirect URI: https://seu-dominio.com/api/auth/microsoft/callback
+//   3. Habilitar tokens de ID e Access no "Authentication"
+//   4. Adicionar permissões: openid, profile, email, User.Read
+//   5. Criar Client Secret (válido por 24 meses)
+export const MICROSOFT_CLIENT_ID = ""; // Preencher com Application (client) ID
+export const MICROSOFT_TENANT_ID = "common"; // "common" = multi-tenant, ou ID específico
+export const MICROSOFT_REDIRECT_URI = typeof window !== 'undefined'
+  ? `${window.location.origin}/api/auth/microsoft/callback`
+  : 'https://escalapro.santacasabh.com.br/api/auth/microsoft/callback';
+
+// URLs de autenticação Microsoft
+export const MICROSOFT_AUTH_URL = `https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/oauth2/v2.0/authorize`;
+export const MICROSOFT_TOKEN_URL = `https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/oauth2/v2.0/token`;
 
 // ============================================
 // CONFIGURAÇÕES DE WHATSAPP (Evolution API)

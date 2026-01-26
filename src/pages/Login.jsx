@@ -2,7 +2,16 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Lock, Mail, ChevronRight, Loader2, Heart } from 'lucide-react';
-import { GOOGLE_CLIENT_ID, APP_NAME, HOSPITAL_NAME } from '../config';
+import { 
+    GOOGLE_CLIENT_ID, 
+    APPLE_CLIENT_ID, 
+    APPLE_REDIRECT_URI,
+    MICROSOFT_CLIENT_ID,
+    MICROSOFT_AUTH_URL,
+    MICROSOFT_REDIRECT_URI,
+    APP_NAME, 
+    HOSPITAL_NAME 
+} from '../config';
 import './Login.css';
 import logo from '../assets/logo-login-new.jpg';
 
@@ -12,11 +21,14 @@ export default function Login() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [googleLoaded, setGoogleLoaded] = useState(false);
+    const [appleLoaded, setAppleLoaded] = useState(false);
 
     const { login, loginSocial } = useAuth();
     const navigate = useNavigate();
 
-    // Carregar Google Sign-In SDK
+    // ===================================================
+    // GOOGLE Sign-In SDK
+    // ===================================================
     useEffect(() => {
         const loadGoogleScript = () => {
             if (document.getElementById('google-signin-script')) {
@@ -36,7 +48,41 @@ export default function Login() {
         loadGoogleScript();
     }, []);
 
+    // ===================================================
+    // APPLE Sign-In SDK
+    // ===================================================
+    useEffect(() => {
+        const loadAppleScript = () => {
+            if (document.getElementById('apple-signin-script')) {
+                setAppleLoaded(true);
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.id = 'apple-signin-script';
+            script.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
+            script.async = true;
+            script.defer = true;
+            script.onload = () => {
+                if (window.AppleID && APPLE_CLIENT_ID) {
+                    window.AppleID.auth.init({
+                        clientId: APPLE_CLIENT_ID,
+                        scope: 'name email',
+                        redirectURI: APPLE_REDIRECT_URI,
+                        usePopup: true
+                    });
+                }
+                setAppleLoaded(true);
+            };
+            document.body.appendChild(script);
+        };
+        
+        loadAppleScript();
+    }, []);
+
+    // ===================================================
     // Inicializar Google Sign-In quando SDK carregar
+    // ===================================================
     useEffect(() => {
         if (googleLoaded && window.google && GOOGLE_CLIENT_ID) {
             window.google.accounts.id.initialize({
@@ -47,7 +93,9 @@ export default function Login() {
         }
     }, [googleLoaded]);
 
+    // ===================================================
     // Callback do Google Sign-In
+    // ===================================================
     const handleGoogleCallback = async (response) => {
         setLoading(true);
         setError('');
@@ -79,6 +127,69 @@ export default function Login() {
         }
     };
 
+    // ===================================================
+    // Callback do Apple Sign-In
+    // ===================================================
+    const handleAppleCallback = async (response) => {
+        setLoading(true);
+        setError('');
+        
+        try {
+            const { authorization, user } = response;
+            
+            const result = await loginSocial({
+                provider: 'apple',
+                token: authorization.id_token,
+                code: authorization.code,
+                profile: user ? {
+                    email: user.email,
+                    name: user.name ? `${user.name.firstName} ${user.name.lastName}` : null
+                } : null
+            });
+            
+            if (result.success) {
+                navigate('/dashboard');
+            } else {
+                setError(result.error || 'Falha no login com Apple');
+            }
+        } catch (err) {
+            console.error('Erro Apple Sign-In:', err);
+            setError('Erro ao processar login com Apple');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ===================================================
+    // Microsoft OAuth 2.0 Flow
+    // ===================================================
+    const handleMicrosoftLogin = () => {
+        if (!MICROSOFT_CLIENT_ID) {
+            setError('Login com Microsoft ainda não configurado. Entre em contato com o suporte.');
+            return;
+        }
+        
+        // Gerar state para segurança (CSRF protection)
+        const state = btoa(JSON.stringify({ 
+            timestamp: Date.now(),
+            nonce: Math.random().toString(36).substring(7)
+        }));
+        sessionStorage.setItem('microsoft_oauth_state', state);
+        
+        // Construir URL de autorização
+        const params = new URLSearchParams({
+            client_id: MICROSOFT_CLIENT_ID,
+            response_type: 'code',
+            redirect_uri: MICROSOFT_REDIRECT_URI,
+            scope: 'openid profile email User.Read',
+            state: state,
+            response_mode: 'query'
+        });
+        
+        // Redirecionar para Microsoft
+        window.location.href = `${MICROSOFT_AUTH_URL}?${params.toString()}`;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -98,36 +209,64 @@ export default function Login() {
         }
     };
 
+    // ===================================================
+    // Handler para login social (Google, Apple, Microsoft)
+    // ===================================================
     const handleSocialLogin = async (provider) => {
         setLoading(true);
         setError('');
         
-        if (provider === 'google' && window.google) {
-            // Usa o Google Sign-In real
-            window.google.accounts.id.prompt((notification) => {
-                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    // Fallback: mostra popup manual
-                    window.google.accounts.id.renderButton(
-                        document.createElement('div'),
-                        { theme: 'outline', size: 'large' }
-                    );
-                    setLoading(false);
-                    setError('Popup bloqueado. Clique novamente ou permita popups.');
-                }
-            });
+        // ---- GOOGLE ----
+        if (provider === 'google') {
+            if (!GOOGLE_CLIENT_ID) {
+                setError('Login com Google não configurado.');
+                setLoading(false);
+                return;
+            }
+            
+            if (window.google) {
+                window.google.accounts.id.prompt((notification) => {
+                    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                        setLoading(false);
+                        setError('Popup bloqueado. Permita popups ou clique novamente.');
+                    }
+                });
+            } else {
+                setError('SDK do Google ainda está carregando. Tente novamente.');
+                setLoading(false);
+            }
             return;
         }
         
-        // Apple e Microsoft - Mensagem informativa
+        // ---- APPLE ----
         if (provider === 'apple') {
+            if (!APPLE_CLIENT_ID) {
+                setError('Login com Apple ainda não configurado. Use Google ou email/senha.');
+                setLoading(false);
+                return;
+            }
+            
+            try {
+                if (window.AppleID) {
+                    const response = await window.AppleID.auth.signIn();
+                    await handleAppleCallback(response);
+                } else {
+                    setError('SDK do Apple ainda está carregando. Tente novamente.');
+                }
+            } catch (err) {
+                console.error('Erro Apple Sign-In:', err);
+                if (err.error !== 'popup_closed_by_user') {
+                    setError('Erro ao conectar com Apple. Tente novamente.');
+                }
+            }
             setLoading(false);
-            setError('Login com Apple será habilitado em breve. Use Google ou email/senha.');
             return;
         }
         
+        // ---- MICROSOFT ----
         if (provider === 'microsoft') {
-            setLoading(false);
-            setError('Login com Microsoft será habilitado em breve. Use Google ou email/senha.');
+            handleMicrosoftLogin();
+            // Não desativa loading pois vai redirecionar
             return;
         }
         

@@ -68,32 +68,70 @@ app.post('/api/auth/register', (req, res) => {
 const { OAuth2Client } = require('google-auth-library');
 const googleClient = new OAuth2Client("869821071891-ut47oq6o3thvnfudni1nun3tk0n8kl2n.apps.googleusercontent.com");
 
+// ============ SOCIAL LOGIN UNIFICADO ============
 app.post('/api/auth/social-login', async (req, res) => {
-  const { provider, token, email, nome, photo } = req.body;
+  const { provider, token, email, nome, photo, code, profile } = req.body;
 
-  if (!email || !provider) {
+  // Aceita tanto formato legado quanto novo
+  const userEmail = email || (profile && profile.email);
+  const userName = nome || (profile && profile.name);
+  const userPhoto = photo || (profile && profile.picture);
+
+  if (!userEmail || !provider) {
     return res.status(400).json({ error: 'Dados insuficientes para login social' });
   }
 
-  // Verificar Token Real (Google)
-  if (provider === 'google' && token) { // Frontend deve enviar o credential como 'token'
+  // ===================================================
+  // GOOGLE - Verificação de Token
+  // ===================================================
+  if (provider === 'google' && token) {
     try {
       const ticket = await googleClient.verifyIdToken({
         idToken: token,
         audience: "869821071891-ut47oq6o3thvnfudni1nun3tk0n8kl2n.apps.googleusercontent.com",
       });
       const payload = ticket.getPayload();
-      // O email do payload deve bater com o enviado ou usamos o do payload como fonte da verdade
-      console.log('Google Auth verificado:', payload.email);
+      console.log('✅ Google Auth verificado:', payload.email);
     } catch (error) {
-      console.error('Erro na validação do token Google:', error);
-      // Em caso de erro de token inválido, podemos bloquear ou seguir como fallback se for ambiente de dev
-      // return res.status(401).json({ error: 'Token inválido' });
+      console.error('❌ Erro na validação do token Google:', error.message);
+      return res.status(401).json({ error: 'Token Google inválido' });
+    }
+  }
+
+  // ===================================================
+  // APPLE - Verificação de Token
+  // ===================================================
+  if (provider === 'apple' && token) {
+    try {
+      // Decodificar JWT da Apple (verificação básica)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      console.log('✅ Apple Auth recebido:', payload.email || payload.sub);
+      // Nota: Para produção, verificar assinatura com chave pública da Apple
+      // https://developer.apple.com/documentation/sign_in_with_apple/sign_in_with_apple_rest_api/verifying_a_user
+    } catch (error) {
+      console.error('❌ Erro na validação do token Apple:', error.message);
+      return res.status(401).json({ error: 'Token Apple inválido' });
+    }
+  }
+
+  // ===================================================
+  // MICROSOFT - Verificação de Token  
+  // ===================================================
+  if (provider === 'microsoft' && token) {
+    try {
+      // Decodificar JWT da Microsoft (verificação básica)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      console.log('✅ Microsoft Auth recebido:', payload.preferred_username || payload.email);
+      // Nota: Para produção, verificar com JWKS da Microsoft
+      // https://login.microsoftonline.com/common/discovery/v2.0/keys
+    } catch (error) {
+      console.error('❌ Erro na validação do token Microsoft:', error.message);
+      return res.status(401).json({ error: 'Token Microsoft inválido' });
     }
   }
 
   // Verificar se o usuário existe
-  let usuario = db.prepare('SELECT * FROM funcionarios WHERE email = ?').get(email);
+  let usuario = db.prepare('SELECT * FROM funcionarios WHERE email = ?').get(userEmail);
 
   if (!usuario) {
     // Cadastro automático via Social Login
@@ -101,9 +139,10 @@ app.post('/api/auth/social-login', async (req, res) => {
     db.prepare(`
       INSERT INTO funcionarios (id, nome, email, tipo, cargo, ativo, foto_url) 
       VALUES (?, ?, ?, 'gestor', 'Gestor (Social)', 1, ?)
-    `).run(id, nome || email.split('@')[0], email, photo || '');
+    `).run(id, userName || userEmail.split('@')[0], userEmail, userPhoto || '');
 
     usuario = db.prepare('SELECT * FROM funcionarios WHERE id = ?').get(id);
+    console.log('📝 Novo usuário criado via', provider, ':', userEmail);
   } else if (usuario.ativo === 0) {
     return res.status(401).json({ error: 'Usuário desativado' });
   }
@@ -113,8 +152,116 @@ app.post('/api/auth/social-login', async (req, res) => {
   res.json({
     success: true,
     user: usuarioSemSenha,
-    token: 'social-token-' + uuidv4()
+    token: `${provider}-token-${uuidv4()}`
   });
+});
+
+// ============ MICROSOFT OAuth CALLBACK ============
+app.get('/api/auth/microsoft/callback', async (req, res) => {
+  const { code, state, error, error_description } = req.query;
+
+  if (error) {
+    console.error('❌ Microsoft OAuth Error:', error, error_description);
+    return res.redirect(`/?error=${encodeURIComponent(error_description || error)}`);
+  }
+
+  if (!code) {
+    return res.redirect('/?error=Código de autorização não recebido');
+  }
+
+  try {
+    // Trocar code por tokens
+    const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || '';
+    const MICROSOFT_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || '';
+    const MICROSOFT_REDIRECT_URI = process.env.MICROSOFT_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/microsoft/callback`;
+
+    const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: MICROSOFT_CLIENT_ID,
+        client_secret: MICROSOFT_CLIENT_SECRET,
+        code: code,
+        redirect_uri: MICROSOFT_REDIRECT_URI,
+        grant_type: 'authorization_code'
+      })
+    });
+
+    const tokens = await tokenResponse.json();
+
+    if (tokens.error) {
+      console.error('❌ Microsoft Token Error:', tokens.error_description);
+      return res.redirect(`/?error=${encodeURIComponent(tokens.error_description)}`);
+    }
+
+    // Decodificar ID token para pegar dados do usuário
+    const payload = JSON.parse(atob(tokens.id_token.split('.')[1]));
+    const email = payload.preferred_username || payload.email;
+    const nome = payload.name;
+
+    // Verificar/criar usuário
+    let usuario = db.prepare('SELECT * FROM funcionarios WHERE email = ?').get(email);
+
+    if (!usuario) {
+      const id = uuidv4();
+      db.prepare(`
+        INSERT INTO funcionarios (id, nome, email, tipo, cargo, ativo) 
+        VALUES (?, ?, ?, 'gestor', 'Gestor (Microsoft)', 1)
+      `).run(id, nome || email.split('@')[0], email);
+      usuario = db.prepare('SELECT * FROM funcionarios WHERE id = ?').get(id);
+    }
+
+    // Redirecionar com dados para o frontend processar
+    const authData = encodeURIComponent(JSON.stringify({
+      success: true,
+      provider: 'microsoft',
+      user: { id: usuario.id, nome: usuario.nome, email: usuario.email },
+      token: `microsoft-token-${uuidv4()}`
+    }));
+
+    res.redirect(`/?auth=${authData}`);
+  } catch (err) {
+    console.error('❌ Microsoft Callback Error:', err);
+    res.redirect('/?error=Erro ao processar login com Microsoft');
+  }
+});
+
+// ============ APPLE OAuth CALLBACK ============
+app.post('/api/auth/apple/callback', async (req, res) => {
+  const { code, id_token, state, user } = req.body;
+
+  if (!id_token && !code) {
+    return res.status(400).json({ error: 'Token ou código não recebido' });
+  }
+
+  try {
+    // Decodificar ID token
+    const payload = JSON.parse(atob(id_token.split('.')[1]));
+    const email = payload.email || (user && JSON.parse(user).email);
+    const nome = user ? JSON.parse(user).name : null;
+
+    // Verificar/criar usuário
+    let usuario = db.prepare('SELECT * FROM funcionarios WHERE email = ?').get(email);
+
+    if (!usuario) {
+      const id = uuidv4();
+      const fullName = nome ? `${nome.firstName || ''} ${nome.lastName || ''}`.trim() : email.split('@')[0];
+      db.prepare(`
+        INSERT INTO funcionarios (id, nome, email, tipo, cargo, ativo) 
+        VALUES (?, ?, ?, 'gestor', 'Gestor (Apple)', 1)
+      `).run(id, fullName, email);
+      usuario = db.prepare('SELECT * FROM funcionarios WHERE id = ?').get(id);
+    }
+
+    res.json({
+      success: true,
+      user: { id: usuario.id, nome: usuario.nome, email: usuario.email },
+      token: `apple-token-${uuidv4()}`
+    });
+  } catch (err) {
+    console.error('❌ Apple Callback Error:', err);
+    res.status(500).json({ error: 'Erro ao processar login com Apple' });
+  }
 });
 
 
