@@ -17,14 +17,14 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    const loginSocial = async ({ provider, profile }) => {
+    const loginSocial = async ({ provider, token, profile }) => {
         try {
             const response = await fetch('/api/auth/social-login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     provider,
-                    token: profile.token, // Passando o token recebido
+                    token: token || profile?.token, // Token JWT do Google para verificação
                     email: profile.email,
                     nome: profile.name,
                     photo: profile.picture
@@ -41,6 +41,7 @@ export const AuthProvider = ({ children }) => {
             }
             return { success: false, error: data.error };
         } catch (error) {
+            console.error('Erro no login social:', error);
             return { success: false, error: 'Erro no login social' };
         }
     };

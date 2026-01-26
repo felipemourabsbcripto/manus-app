@@ -2,21 +2,82 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Lock, Mail, ChevronRight, Loader2, Heart } from 'lucide-react';
-import * as config from '../config';
+import { GOOGLE_CLIENT_ID, APP_NAME, HOSPITAL_NAME } from '../config';
 import './Login.css';
 import logo from '../assets/logo-login-new.jpg';
 
 export default function Login() {
-    // ... existing state ...
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [googleLoaded, setGoogleLoaded] = useState(false);
 
     const { login, loginSocial } = useAuth();
     const navigate = useNavigate();
 
-    // ... existing useEffect ...
+    // Carregar Google Sign-In SDK
+    useEffect(() => {
+        const loadGoogleScript = () => {
+            if (document.getElementById('google-signin-script')) {
+                setGoogleLoaded(true);
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.id = 'google-signin-script';
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            script.onload = () => setGoogleLoaded(true);
+            document.body.appendChild(script);
+        };
+        
+        loadGoogleScript();
+    }, []);
+
+    // Inicializar Google Sign-In quando SDK carregar
+    useEffect(() => {
+        if (googleLoaded && window.google && GOOGLE_CLIENT_ID) {
+            window.google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleGoogleCallback,
+                auto_select: false,
+            });
+        }
+    }, [googleLoaded]);
+
+    // Callback do Google Sign-In
+    const handleGoogleCallback = async (response) => {
+        setLoading(true);
+        setError('');
+        
+        try {
+            // Decodificar JWT para obter dados do usuário
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            
+            const result = await loginSocial({
+                provider: 'google',
+                token: response.credential, // Token real para verificação no backend
+                profile: {
+                    email: payload.email,
+                    name: payload.name,
+                    picture: payload.picture
+                }
+            });
+            
+            if (result.success) {
+                navigate('/dashboard');
+            } else {
+                setError(result.error || 'Falha no login com Google');
+            }
+        } catch (err) {
+            console.error('Erro Google Sign-In:', err);
+            setError('Erro ao processar login com Google');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -39,25 +100,38 @@ export default function Login() {
 
     const handleSocialLogin = async (provider) => {
         setLoading(true);
-        // Simulação de login social fallback (Development) ou integração real futura
-        const mockProfile = {
-            email: email || `user_${provider}@santacasabh.com.br`,
-            name: 'Usuário Santa Casa',
-            picture: ''
-        };
-
-        try {
-            const result = await loginSocial({ provider, profile: mockProfile });
-            if (result.success) {
-                navigate('/dashboard');
-            } else {
-                setError(result.error || 'Falha no login social');
-            }
-        } catch (err) {
-            setError('Erro ao processar login social');
-        } finally {
-            setLoading(false);
+        setError('');
+        
+        if (provider === 'google' && window.google) {
+            // Usa o Google Sign-In real
+            window.google.accounts.id.prompt((notification) => {
+                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                    // Fallback: mostra popup manual
+                    window.google.accounts.id.renderButton(
+                        document.createElement('div'),
+                        { theme: 'outline', size: 'large' }
+                    );
+                    setLoading(false);
+                    setError('Popup bloqueado. Clique novamente ou permita popups.');
+                }
+            });
+            return;
         }
+        
+        // Apple e Microsoft - Mensagem informativa
+        if (provider === 'apple') {
+            setLoading(false);
+            setError('Login com Apple será habilitado em breve. Use Google ou email/senha.');
+            return;
+        }
+        
+        if (provider === 'microsoft') {
+            setLoading(false);
+            setError('Login com Microsoft será habilitado em breve. Use Google ou email/senha.');
+            return;
+        }
+        
+        setLoading(false);
     };
 
     return (
