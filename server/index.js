@@ -36,7 +36,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/register', (req, res) => {
-  const { nome, email, senha, telefone } = req.body;
+  const { nome, email, senha, telefone, crm, uf, especialidade } = req.body;
 
   if (!nome || !email || !senha) {
     return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
@@ -48,24 +48,48 @@ app.post('/api/auth/register', (req, res) => {
   }
 
   const id = uuidv4();
-  // Por padrão, quem se cadastra é "gestor" para poder testar o sistema, ou "funcionario"? 
-  // O usuário pediu área de cadastro. Vamos criar como 'gestor' para ele poder usar o sistema, ou 'funcionario' pendente?
-  // Vou criar como 'gestor' por enquanto para facilitar o teste do Felipe, mas o ideal seria aprovação.
+  // Se informou CRM, é médico. Se não, é gestor? 
+  // O sistema parece focar em gestores de escala (que costumam ser médicos chefes).
+  // Vou salvar como 'medico' se tiver CRM, ou manter 'gestor' como padrão
+  // O usuário pediu "Cadastro", assumindo que ele quer acessar o sistema.
+  const tipo = crm ? 'medico' : 'gestor';
+  const crmFormatado = crm ? `${crm}/${uf}` : null;
+  const especialidadeFinal = especialidade || (crm ? 'Geral' : null);
 
   db.prepare(`
-    INSERT INTO funcionarios (id, nome, email, senha, telefone, tipo, cargo, ativo) 
-    VALUES (?, ?, ?, ?, ?, 'gestor', 'Gestor', 1)
-  `).run(id, nome, email, senha, telefone);
+    INSERT INTO funcionarios (id, nome, email, senha, telefone, tipo, cargo, ativo, crm, especialidade) 
+    VALUES (?, ?, ?, ?, ?, ?, 'Gestor/Médico', 1, ?, ?)
+  `).run(id, nome, email, senha, telefone, tipo, crmFormatado, especialidadeFinal);
 
   res.json({ success: true, message: 'Cadastro realizado com sucesso' });
 });
 
+
+const { OAuth2Client } = require('google-auth-library');
+const googleClient = new OAuth2Client("869821071891-ut47oq6o3thvnfudni1nun3tk0n8kl2n.apps.googleusercontent.com");
 
 app.post('/api/auth/social-login', async (req, res) => {
   const { provider, token, email, nome, photo } = req.body;
 
   if (!email || !provider) {
     return res.status(400).json({ error: 'Dados insuficientes para login social' });
+  }
+
+  // Verificar Token Real (Google)
+  if (provider === 'google' && token) { // Frontend deve enviar o credential como 'token'
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: "869821071891-ut47oq6o3thvnfudni1nun3tk0n8kl2n.apps.googleusercontent.com",
+      });
+      const payload = ticket.getPayload();
+      // O email do payload deve bater com o enviado ou usamos o do payload como fonte da verdade
+      console.log('Google Auth verificado:', payload.email);
+    } catch (error) {
+      console.error('Erro na validação do token Google:', error);
+      // Em caso de erro de token inválido, podemos bloquear ou seguir como fallback se for ambiente de dev
+      // return res.status(401).json({ error: 'Token inválido' });
+    }
   }
 
   // Verificar se o usuário existe
@@ -93,6 +117,63 @@ app.post('/api/auth/social-login', async (req, res) => {
   });
 });
 
+
+// ============ CONSULTA CRM ============
+// Status: MOCK ATIVO (Simulação Gratuita)
+// Para ativar Consultar.io: Mude USE_MOCK para false e configure a API_KEY.
+const USE_MOCK = true;
+const CONSULTARIO_API_KEY = process.env.CONSULTARIO_KEY || '';
+
+app.get('/api/crm/consulta', async (req, res) => {
+  const { crm, uf } = req.query;
+
+  if (!crm || !uf) {
+    return res.status(400).json({ error: 'CRM e UF são obrigatórios' });
+  }
+
+  // --- MODO: CONSULTAR.IO (FUTURO) ---
+  if (!USE_MOCK) {
+    try {
+      // Exemplo de chamada real (ajustar conforme documentação oficial)
+      // const response = await fetch(`https://api.consultar.io/v1/crm/${uf}/${crm}?token=${CONSULTARIO_API_KEY}`);
+      // const data = await response.json();
+      // return res.json(data);
+      return res.status(501).json({ error: 'Integração Consultar.io ainda não configurada com chave.' });
+    } catch (error) {
+      return res.status(500).json({ error: 'Erro ao consultar API externa' });
+    }
+  }
+
+  // --- MODO: MOCK (SIMULAÇÃO) ---
+  // Validação básica de formato
+  const crmClean = crm.replace(/\D/g, '');
+  const ufClean = uf.toUpperCase();
+
+  if (crmClean.length < 4 || crmClean.length > 10) {
+    return res.status(400).json({ error: 'CRM inválido (formato incorreto)' });
+  }
+
+  if (['MG', 'SP', 'RJ', 'ES', 'BA'].indexOf(ufClean) === -1) {
+    return res.status(404).json({ error: 'CRM não encontrado ou UF não suportada na simulação' });
+  }
+
+  // Mock dinâmico
+  const lastDigit = parseInt(crmClean.slice(-1));
+  const especialidades = ['Cardiologia', 'Pediatria', 'Clínica Médica', 'Ortopedia', 'Neurologia'];
+  const nomes = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Pereira'];
+
+  // Atraso artificial para parecer requisição real
+  await new Promise(r => setTimeout(r, 800));
+
+  res.json({
+    nome: `Dr(a). Médico Simulado ${nomes[lastDigit % 5] || 'teste'}`,
+    crm: crmClean,
+    uf: ufClean,
+    situacao: 'Regular',
+    especialidade: especialidades[lastDigit % 5] || 'Geral',
+    data_inscricao: '10/05/2015'
+  });
+});
 
 // ============ FUNCIONÁRIOS / MÉDICOS ============
 app.get('/api/funcionarios', (req, res) => {

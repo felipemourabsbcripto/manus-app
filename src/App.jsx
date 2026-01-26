@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, Clock, AlertTriangle,
-  DollarSign, Bell, Settings, Star, MessageSquare, MapPin, FileText, LogOut, Heart
+  DollarSign, Bell, Settings, Star, MessageSquare, MapPin, FileText, LogOut, Heart, Menu, X
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Funcionarios from './pages/Funcionarios';
@@ -21,6 +21,8 @@ import Login from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { API_URL } from './config';
 import './App.css';
+import logo from './assets/logo-login.png';
+
 
 // Componente para rotas privadas
 const PrivateRoute = () => {
@@ -36,6 +38,7 @@ const PrivateRoute = () => {
 // Layout principal com Sidebar
 const AppLayout = () => {
   const [avisosNaoLidos, setAvisosNaoLidos] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { logout, user } = useAuth();
 
   useEffect(() => {
@@ -56,10 +59,31 @@ const AppLayout = () => {
 
   return (
     <div className="app-container">
-      <nav className="sidebar">
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <button className="menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+          <Menu size={24} color="var(--text-primary)" />
+        </button>
+        <div className="mobile-logo">
+          <Heart size={20} fill="#e11d48" color="#e11d48" />
+          <span>Gestor de Plantões</span>
+        </div>
+      </div>
+
+      {/* Overlay for mobile */}
+      {isMobileMenuOpen && (
+        <div className="sidebar-overlay" onClick={() => setIsMobileMenuOpen(false)}></div>
+      )}
+
+      <nav className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
+        {isMobileMenuOpen && (
+          <button className="mobile-close-btn" onClick={() => setIsMobileMenuOpen(false)}>
+            <X size={24} />
+          </button>
+        )}
         <div className="logo">
           <div className="logo-icon">
-            <Heart size={24} fill="white" color="white" />
+            <img src={logo} alt="Santa Casa BH" />
           </div>
           <div>
             <h1>Santa Casa BH</h1>
@@ -68,52 +92,52 @@ const AppLayout = () => {
         </div>
 
         <div className="nav-menu">
-          <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <LayoutDashboard />
             <span>Dashboard</span>
           </NavLink>
 
-          <NavLink to="/escalas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/escalas" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Calendar />
             <span>Escalas</span>
           </NavLink>
 
-          <NavLink to="/funcionarios" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/funcionarios" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Users />
             <span>Médicos e Equipe</span>
           </NavLink>
 
-          <NavLink to="/presencas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/presencas" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Clock />
             <span>Presenças</span>
           </NavLink>
 
-          <NavLink to="/furos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/furos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <AlertTriangle />
             <span>Furos e Faltas</span>
           </NavLink>
 
-          <NavLink to="/pagamentos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/pagamentos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <DollarSign />
             <span>Pagamentos</span>
           </NavLink>
 
-          <NavLink to="/avisos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/avisos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Bell />
             <span>Avisos</span>
           </NavLink>
 
-          <NavLink to="/whatsapp" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/whatsapp" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <MessageSquare />
             <span>Comunicação</span>
           </NavLink>
 
-          <NavLink to="/relatorios" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/relatorios" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <FileText />
             <span>Relatórios</span>
           </NavLink>
 
-          <NavLink to="/configuracoes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/configuracoes" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Settings />
             <span>Configurações</span>
           </NavLink>

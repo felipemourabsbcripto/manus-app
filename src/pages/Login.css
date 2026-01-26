@@ -1,0 +1,222 @@
+/* --- FUNDO GERAL (Tema Clínico/Clean) --- */
+.login-container {
+    background-color: #F1F5F9;
+    background-image: url('../assets/login-bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    /* Cinza gelo muito suave */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    font-family: 'Lora', serif;
+    /* Fonte padrão Lora */
+    position: relative;
+    overflow: hidden;
+}
+
+.login-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.65);
+    /* Overlay branco para suavizar a imagem */
+    z-index: 1;
+}
+
+/* --- CARD PRINCIPAL --- */
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 48px;
+    background-color: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+        0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    border: 1px solid #E2E8F0;
+    position: relative;
+    z-index: 10;
+}
+
+/* --- LOGO WRAPPER --- */
+.logo-wrapper {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.logo-img {
+    max-width: 140px;
+    /* Increased from ~small to 140px based on user request "aumente logo... um pouco" - Assuming previous was smaller or visually small */
+    height: auto;
+    margin-bottom: 8px;
+    /* Spacing between logo and new text */
+}
+
+.institution-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem;
+    color: #e11d48;
+    /* Primary Red */
+    margin: 0;
+    line-height: 1.2;
+}
+
+/* --- TIPOGRAFIA --- */
+.login-title {
+    font-family: 'DM Serif Display', serif;
+    /* Fonte título */
+    font-size: 2rem;
+    font-weight: 400;
+    /* DM Serif é naturalmente bold/serifado */
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+}
+
+.login-subtitle {
+    font-size: 1rem;
+    color: #64748b;
+    margin-bottom: 2rem;
+    font-weight: 500;
+}
+
+/* --- INPUTS --- */
+.input-group {
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.input-label {
+    display: block;
+    color: #475569;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.input-field {
+    width: 100%;
+    padding: 12px 16px;
+    background-color: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    color: #1E293B;
+    font-size: 15px;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.input-field:focus {
+    background-color: #FFFFFF;
+    border-color: #E11D48;
+    box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.1);
+}
+
+.input-field::placeholder {
+    color: #94A3B8;
+}
+
+/* --- BOTÃO PRIMARY --- */
+.btn-login {
+    width: 100%;
+    padding: 0.875rem;
+    background-color: #e11d48;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 1.1rem;
+    /* Fonte um pouco maior */
+    cursor: pointer;
+    margin-top: 1rem;
+    transition: all 0.3s ease;
+    font-family: 'DM Serif Display', serif;
+    /* Fonte "Acessar Sistema" */
+}
+
+.btn-login:hover {
+    background-color: #BE123C;
+}
+
+.btn-login:disabled {
+    background-color: #FDA4AF;
+    cursor: not-allowed;
+}
+
+/* --- SEPARADOR --- */
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 24px 0;
+    color: #94A3B8;
+    font-size: 13px;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+.divider::before {
+    margin-right: .5em;
+}
+
+.divider::after {
+    margin-left: .5em;
+}
+
+/* --- SOCIAL BUTTONS --- */
+
+.btn-social {
+    width: 48px;
+    /* Fixed width for icon buttons */
+    height: 48px;
+    background: #FFFFFF;
+    border: 1px solid rgba(225, 29, 72, 0.2);
+    /* Borda sutil vermelha */
+    color: #475569;
+    padding: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-social:hover {
+    background-color: #FFF1F2;
+    /* Tint vermelho suave */
+    border-color: rgba(225, 29, 72, 0.5);
+}
+
+/* --- FOOTER --- */
+.footer-link {
+    margin-top: 24px;
+    font-size: 14px;
+    color: #64748B;
+    text-align: center;
+}
+
+.footer-link a {
+    color: #E11D48;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.app-footer {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}

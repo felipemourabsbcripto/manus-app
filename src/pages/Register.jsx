@@ -8,18 +8,51 @@ export default function Register() {
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [telefone, setTelefone] = useState('');
+    const [crm, setCrm] = useState('');
+    const [uf, setUf] = useState('MG');
+    const [crmData, setCrmData] = useState(null);
+
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
     const { register } = useAuth();
     const navigate = useNavigate();
 
+    const verificarCRM = async () => {
+        if (crm.length < 4) return;
+
+        try {
+            const response = await fetch(`/api/crm/consulta?crm=${crm}&uf=${uf}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                setCrmData(data);
+                // Opcional: Auto-preencher nome se vazio
+                if (!nome) setNome(data.nome);
+                setError('');
+            } else {
+                setCrmData(null);
+                setError(data.error || 'CRM não encontrado');
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
-        const result = await register({ nome, email, senha, telefone });
+        const result = await register({
+            nome,
+            email,
+            senha,
+            telefone,
+            crm,
+            uf,
+            especialidade: crmData?.especialidade
+        });
 
         if (result.success) {
             navigate('/dashboard');
@@ -115,6 +148,46 @@ export default function Register() {
                             />
                         </div>
                     </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">CRM</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                style={{ height: '3.5rem' }}
+                                placeholder="123456"
+                                value={crm}
+                                onChange={(e) => setCrm(e.target.value)}
+                                onBlur={verificarCRM}
+                            />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">UF</label>
+                            <select
+                                className="form-input"
+                                style={{ height: '3.5rem' }}
+                                value={uf}
+                                onChange={(e) => setUf(e.target.value)}
+                            >
+                                <option value="MG">MG</option>
+                                <option value="SP">SP</option>
+                                <option value="RJ">RJ</option>
+                                <option value="ES">ES</option>
+                                <option value="BA">BA</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {crmData && (
+                        <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '0.85rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></div>
+                            <div>
+                                <strong style={{ color: '#10b981', display: 'block' }}>CRM Válido</strong>
+                                <span style={{ color: 'var(--text-secondary)' }}>{crmData.nome} - {crmData.especialidade}</span>
+                            </div>
+                        </div>
+                    )}
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>

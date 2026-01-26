@@ -18,6 +18,7 @@ const getApiUrl = () => {
 export const API_URL = '/api';
 
 // Configurações de Login Social
-// Substitua estas chaves após gerá-las nos consoles do Google/Microsoft
-export const GOOGLE_CLIENT_ID = "SEU_GOOGLE_CLIENT_ID_AQUI.apps.googleusercontent.com";
+// Substitua estas chaves após gerá-las nos consoles do Google/Apple/Microsoft
+export const GOOGLE_CLIENT_ID = "869821071891-ut47oq6o3thvnfudni1nun3tk0n8kl2n.apps.googleusercontent.com";
+export const APPLE_CLIENT_ID = "com.santacasabh.manus.login"; // Seu Service ID da Apple
 export const MICROSOFT_CLIENT_ID = "SEU_MICROSOFT_CLIENT_ID_AQUI";

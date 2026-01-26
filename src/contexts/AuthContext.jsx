@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     provider,
+                    token: profile.token, // Passando o token recebido
                     email: profile.email,
                     nome: profile.name,
                     photo: profile.picture

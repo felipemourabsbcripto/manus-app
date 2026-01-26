@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, Mail, ChevronRight, Loader2, Heart, Apple } from 'lucide-react';
+import { Lock, Mail, ChevronRight, Loader2, Heart } from 'lucide-react';
+import * as config from '../config';
+import './Login.css';
+import logo from '../assets/logo-login-new.jpg';
 
 export default function Login() {
+    // ... existing state ...
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [error, setError] = useState('');
@@ -12,192 +16,146 @@ export default function Login() {
     const { login, loginSocial } = useAuth();
     const navigate = useNavigate();
 
+    // ... existing useEffect ...
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
-        const result = await login(email, senha);
-
-        if (result.success) {
-            navigate('/dashboard');
-        } else {
-            setError(result.error || 'Falha ao realizar login');
+        try {
+            const result = await login(email, senha);
+            if (result.success) {
+                navigate('/dashboard');
+            } else {
+                setError(result.error || 'Falha ao realizar login');
+            }
+        } catch (err) {
+            setError('Erro inesperado ao fazer login');
+        } finally {
             setLoading(false);
         }
     };
 
     const handleSocialLogin = async (provider) => {
         setLoading(true);
-        // Simulação de login social (Front-end side)
-        // Em um app real, aqui chamaria o SDK do Google/Apple/MS
+        // Simulação de login social fallback (Development) ou integração real futura
         const mockProfile = {
             email: email || `user_${provider}@santacasabh.com.br`,
-            name: email.split('@')[0] || 'Usuário Santa Casa',
+            name: 'Usuário Santa Casa',
             picture: ''
         };
 
-        const result = await loginSocial({ provider, profile: mockProfile });
-        if (result.success) {
-            navigate('/dashboard');
-        } else {
-            setError(result.error);
+        try {
+            const result = await loginSocial({ provider, profile: mockProfile });
+            if (result.success) {
+                navigate('/dashboard');
+            } else {
+                setError(result.error || 'Falha no login social');
+            }
+        } catch (err) {
+            setError('Erro ao processar login social');
+        } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            background: 'radial-gradient(circle at top right, #1e1b4b, #020617)',
-            padding: '1.5rem',
-            position: 'relative',
-            overflow: 'hidden'
-        }}>
-            {/* Elementos decorativos de fundo */}
-            <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '40%', height: '40%', background: 'var(--glow)', filter: 'blur(120px)', borderRadius: '50%', opacity: 0.5 }}></div>
-            <div style={{ position: 'absolute', bottom: '-10%', right: '-10%', width: '40%', height: '40%', background: 'var(--glow)', filter: 'blur(120px)', borderRadius: '50%', opacity: 0.3 }}></div>
-
-            <div className="card" style={{
-                width: '100%',
-                maxWidth: '480px',
-                padding: '3rem',
-                border: '1px solid var(--border)',
-                backdropFilter: 'blur(20px)',
-                background: 'rgba(15, 23, 42, 0.6)',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                zIndex: 1
-            }}>
-                <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-                    <div style={{
-                        display: 'inline-flex',
-                        padding: '1.25rem',
-                        borderRadius: '1.5rem',
-                        background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
-                        marginBottom: '1.5rem',
-                        boxShadow: '0 0 30px var(--glow)'
-                    }}>
-                        <Heart size={40} fill="white" color="white" />
-                    </div>
-                    <h1 style={{
-                        fontSize: '2rem',
-                        fontWeight: 800,
-                        marginBottom: '0.5rem',
-                        letterSpacing: '-0.03em',
-                        background: 'linear-gradient(to right, #ffffff, #94a3b8)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent'
-                    }}>Santa Casa BH</h1>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 500 }}>Gestor de Plantões Inteligente</p>
+        <div className="login-container">
+            <div className="login-card">
+                {/* Header / Logo */}
+                <div className="logo-wrapper">
+                    <img
+                        src={logo}
+                        alt="Santa Casa BH"
+                        className="logo-img"
+                    />
+                    <h2 className="institution-name">Santa Casa BH</h2>
                 </div>
 
+                <h1 className="login-title">Gestor de Escalas</h1>
+                <p className="login-subtitle">Acesse sua conta para continuar</p>
+
+                {/* Form Block */}
                 {error && (
-                    <div className="alert alert-danger" style={{ marginBottom: '1.5rem', fontSize: '0.9rem', borderRadius: '0.75rem' }}>
+                    <div className="alert alert-danger" style={{
+                        marginBottom: '1rem',
+                        padding: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem'
+                    }}>
                         <span>{error}</span>
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label">E-mail Corporativo</label>
-                        <div style={{ position: 'relative' }}>
-                            <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                            <input
-                                id="email"
-                                type="email"
-                                className="form-input"
-                                style={{ paddingLeft: '3rem', height: '3.5rem' }}
-                                placeholder="seu.nome@santacasabh.com.br"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
-                        </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="input-group">
+                        <label className="input-label" htmlFor="email">Email Corporativo</label>
+                        <input
+                            id="email"
+                            type="email"
+                            className="input-field"
+                            placeholder="seu.nome@santacasabh.com.br"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
                     </div>
 
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Senha de Acesso</label>
-                        <div style={{ position: 'relative' }}>
-                            <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                            <input
-                                id="senha"
-                                type="password"
-                                className="form-input"
-                                style={{ paddingLeft: '3rem', height: '3.5rem' }}
-                                placeholder="••••••••"
-                                value={senha}
-                                onChange={(e) => setSenha(e.target.value)}
-                                required
-                            />
-                        </div>
+                    <div className="input-group">
+                        <label className="input-label" htmlFor="senha">Senha</label>
+                        <input
+                            id="senha"
+                            type="password"
+                            className="input-field"
+                            placeholder="••••••••"
+                            value={senha}
+                            onChange={(e) => setSenha(e.target.value)}
+                            required
+                        />
                     </div>
 
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        style={{ width: '100%', justifyContent: 'center', height: '3.5rem', marginTop: '0.5rem', fontSize: '1rem' }}
-                        disabled={loading}
-                    >
+                    <button type="submit" className="btn-login" disabled={loading}>
                         {loading ? (
-                            <Loader2 size={24} className="spinner" style={{ borderTopColor: 'white' }} />
+                            <Loader2 size={24} className="spinner" />
                         ) : (
-                            <>
-                                <span>Entrar no Sistema</span>
-                                <ChevronRight size={20} />
-                            </>
+                            <span>Acessar Sistema</span>
                         )}
                     </button>
                 </form>
 
-                <div style={{ display: 'flex', alignItems: 'center', margin: '2rem 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}></div>
-                    <span style={{ padding: '0 1rem' }}>OU CONTINUE COM</span>
-                    <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}></div>
-                </div>
+                {/* Footer Block */}
+                <div className="divider">Ou continue com</div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '2rem' }}>
-                    <button
-                        type="button"
-                        className="btn"
-                        style={{ background: '#000', color: '#fff', justifyContent: 'center', padding: '0.75rem 0' }}
-                        onClick={() => handleSocialLogin('apple')}
-                    >
-                        <Apple size={20} fill="white" />
+                <div className="social-buttons" style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                    <button type="button" className="btn-social" onClick={() => handleSocialLogin('apple')} title="Entrar com Apple">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="black">
+                            <path d="M17.05 20.28c-.98.95-2.05 1.6-3.08 1.6-1.01 0-2.03-1.05-3.05-1.05-1.03 0-1.88 1.03-2.91 1.05-1.12.03-2.45-1.28-3.41-2.93C2.26 15.34 2.5 9.4 6.7 9.17c1.37.03 2.51.98 3.32.98.81 0 1.96-1.07 3.51-1.07 1.25 0 2.58.55 3.39 1.55-2.8 1.48-2.31 5.38.48 6.64-.53 1.34-1.27 2.67-1.35 3.01zM12.95 6.7c.68-.89 1.15-2.06 1.01-3.23-1.06.05-2.31.74-3.04 1.63-.61.73-1.12 1.9-1.01 3.09 1.18.09 2.37-.62 3.04-1.49z" />
+                        </svg>
                     </button>
-                    <button
-                        type="button"
-                        className="btn"
-                        style={{ background: 'white', color: '#333', justifyContent: 'center', padding: '0.75rem 0' }}
-                        onClick={() => handleSocialLogin('google')}
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M24 12.27c0-.85-.07-1.68-.21-2.48H12v4.69h6.73c-.29 1.57-1.17 2.9-2.51 3.79v3.15h4.06c2.37-2.19 3.73-5.41 3.73-9.15z" /><path fill="#FBBC05" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-4.06-3.15c-1.13.75-2.57 1.2-3.87 1.2-2.98 0-5.5-2.02-6.4-4.73H1.41v3.31C3.39 21.65 7.42 24 12 24z" /><path fill="#34A853" d="M5.6 14.41c-.24-.71-.37-1.46-.37-2.41s.13-1.7.37-2.41V6.29H1.41C.51 8.08 0 10.01 0 12s.51 3.92 1.41 5.71l4.19-3.3z" /><path fill="#4285F4" d="M12 4.77c1.76 0 3.35.6 4.6 1.8l3.44-3.44C17.94 1.13 15.23 0 12 0 7.42 0 3.39 2.35 1.41 6.29l4.19 3.3c.9-2.71 3.42-4.73 6.4-4.73z" /></svg>
+
+                    <button type="button" className="btn-social" onClick={() => handleSocialLogin('google')} title="Entrar com Google">
+                        <svg width="24" height="24" viewBox="0 0 24 24"><path fill="#EA4335" d="M24 12.27c0-.85-.07-1.68-.21-2.48H12v4.69h6.73c-.29 1.57-1.17 2.9-2.51 3.79v3.15h4.06c2.37-2.19 3.73-5.41 3.73-9.15z" /><path fill="#FBBC05" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-4.06-3.15c-1.13.75-2.57 1.2-3.87 1.2-2.98 0-5.5-2.02-6.4-4.73H1.41v3.31C3.39 21.65 7.42 24 12 24z" /><path fill="#34A853" d="M5.6 14.41c-.24-.71-.37-1.46-.37-2.41s.13-1.7.37-2.41V6.29H1.41C.51 8.08 0 10.01 0 12s.51 3.92 1.41 5.71l4.19-3.3z" /><path fill="#4285F4" d="M12 4.77c1.76 0 3.35.6 4.6 1.8l3.44-3.44C17.94 1.13 15.23 0 12 0 7.42 0 3.39 2.35 1.41 6.29l4.19 3.3c.9-2.71 3.42-4.73 6.4-4.73z" /></svg>
                     </button>
-                    <button
-                        type="button"
-                        className="btn"
-                        style={{ background: '#0067b8', color: 'white', justifyContent: 'center', padding: '0.75rem 0' }}
-                        onClick={() => handleSocialLogin('microsoft')}
-                    >
-                        <svg width="20" height="20" viewBox="0 0 23 23"><path fill="#f3f3f3" d="M0 0h11v11H0z" /><path fill="#f3f3f3" d="M12 0h11v11H12z" /><path fill="#f3f3f3" d="M0 12h11v11H0z" /><path fill="#f3f3f3" d="M12 12h11v11H12z" /></svg>
+
+                    <button type="button" className="btn-social" onClick={() => handleSocialLogin('microsoft')} title="Entrar com Microsoft">
+                        <svg width="21" height="21" viewBox="0 0 21 21">
+                            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+                            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+                            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+                            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+                        </svg>
                     </button>
                 </div>
 
-                <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    Novo colaborador? <Link to="/register" style={{ color: 'var(--primary)', fontWeight: 700, textDecoration: 'none' }}>Solicitar Acesso</Link>
+                <div className="footer-link">
+                    Novo colaborador? <Link to="/register">Solicitar Acesso</Link>
                 </div>
 
-                <div style={{
-                    marginTop: '3rem',
-                    textAlign: 'center',
-                    fontSize: '0.75rem',
-                    color: 'var(--secondary)',
-                    opacity: 0.6
-                }}>
-                    &copy; {new Date().getFullYear()} Santa Casa Belo Horizonte.<br />
-                    Todos os direitos reservados.
+                <div className="app-footer" style={{ fontSize: '12px', color: '#cbd5e1', width: '100%' }}>
+                    &copy; 2026 Felipe Moura Devgestor
                 </div>
             </div>
         </div>

@@ -6,6 +6,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { API_URL } from '../config';
+import logo from '../assets/logo-login.png';
 
 import { useAuth } from '../contexts/AuthContext';
 
@@ -76,7 +77,7 @@ function Dashboard() {
       {/* Header Institucional */}
       <div className="card" style={{
         marginBottom: '3rem',
-        background: 'linear-gradient(135deg, rgba(225, 29, 72, 0.1) 0%, rgba(15, 23, 42, 0.4) 100%)',
+        background: '#1E293B', /* Dark Mode Slate 800 */
         padding: '2.5rem',
         display: 'flex',
         justifyContent: 'space-between',
@@ -91,9 +92,9 @@ function Dashboard() {
             Bem-vindo ao Gestor de Plantões da Santa Casa BH. Estamos operando em {format(new Date(), "dd 'de' MMMM", { locale: ptBR })}.
           </p>
         </div>
-        <div style={{ opacity: 0.2 }}>
-          <Heart size={80} fill="var(--primary)" color="var(--primary)" />
-        </div>
+
+
+
       </div>
 
       {/* Stats Grid */}

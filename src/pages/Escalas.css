@@ -1,0 +1,387 @@
+/* Escalas.css - Google Calendar Style */
+
+.escalas-container {
+    height: calc(100vh - 84px);
+    /* Full height minus header/padding approx */
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Header --- */
+.calendar-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+.calendar-nav {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.calendar-title {
+    font-family: 'Roboto', sans-serif;
+    font-size: 1.35rem;
+    font-weight: 500;
+    color: #1e293b;
+    min-width: 200px;
+}
+
+.today-btn {
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: white;
+    margin-right: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.today-btn:hover {
+    background: #f1f5f9;
+}
+
+.nav-btn {
+    background: none;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #64748b;
+}
+
+.nav-btn:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+.view-switcher {
+    display: flex;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 8px;
+    gap: 2px;
+}
+
+.view-btn {
+    padding: 6px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.view-btn.active {
+    background: #ffffff;
+    color: #e11d48;
+    /* Santa Casa Red */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+}
+
+/* --- Month View --- */
+.month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: 40px auto;
+    /* Header row + content */
+    flex: 1;
+    overflow: hidden;
+}
+
+.weekday-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
+}
+
+.weekday-header:last-child {
+    border-right: none;
+}
+
+.month-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: repeat(auto-fill, minmax(100px, 1fr));
+    /* Fill remaining space */
+    grid-column: 1 / -1;
+    overflow-y: auto;
+}
+
+/* Fix for grid height to fill container correctly */
+.month-body {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-auto-rows: minmax(120px, 1fr);
+    grid-column: 1 / -1;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.calendar-cell {
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.5rem;
+    position: relative;
+    min-height: 120px;
+    transition: background 0.2s;
+}
+
+.calendar-cell:hover {
+    background: #f8fafc;
+}
+
+.calendar-cell.different-month {
+    background: #f9fafb;
+}
+
+.calendar-cell.different-month .day-number {
+    color: #cbd5e1;
+}
+
+.calendar-cell.today .day-number {
+    background: #e11d48;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.day-number {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #475569;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+
+/* --- Events (Chips) --- */
+.event-chip {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    color: white;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: transform 0.1s;
+}
+
+.event-chip:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+}
+
+.event-chip.morning {
+    background: #0ea5e9;
+}
+
+/* Blue */
+.event-chip.afternoon {
+    background: #f59e0b;
+}
+
+/* Orange */
+.event-chip.night {
+    background: #6366f1;
+}
+
+/* Indigo */
+.event-chip.custom {
+    background: #10b981;
+}
+
+/* Green */
+
+.event-more {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 600;
+    cursor: pointer;
+    padding-left: 4px;
+}
+
+.event-more:hover {
+    color: #1e293b;
+    text-decoration: underline;
+}
+
+/* --- Week View (Column Vertical) --- */
+.week-container {
+    display: flex;
+    flex: 1;
+    overflow-y: hidden;
+}
+
+.time-gutter {
+    width: 60px;
+    border-right: 1px solid #e2e8f0;
+    overflow-y: hidden;
+    background: #ffffff;
+}
+
+.week-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    overflow-y: auto;
+    position: relative;
+}
+
+.week-column {
+    border-right: 1px solid #e2e8f0;
+    position: relative;
+    min-height: 100%;
+}
+
+.week-header-row {
+    display: flex;
+    border-bottom: 1px solid #e2e8f0;
+    margin-left: 60px;
+    /* Offset for gutter */
+}
+
+.week-header-cell {
+    flex: 1;
+    text-align: center;
+    padding: 0.75rem 0;
+    border-right: 1px solid #e2e8f0;
+}
+
+.week-day-name {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.week-day-num {
+    font-size: 1.25rem;
+    font-weight: 400;
+    color: #1e293b;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0.25rem auto 0;
+    border-radius: 50%;
+}
+
+.week-header-cell.today .week-day-num {
+    background: #e11d48;
+    color: white;
+}
+
+.week-header-cell.today .week-day-name {
+    color: #e11d48;
+}
+
+/* --- Day View (Detailed List) --- */
+.day-view-container {
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.day-event-card {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s;
+}
+
+.day-event-card:hover {
+    transform: translateX(4px);
+    border-left: 4px solid #e11d48;
+}
+
+.event-time-col {
+    width: 100px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.event-info-col {
+    flex: 1;
+}
+
+.event-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.25rem;
+}
+
+.event-subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+    .calendar-title {
+        font-size: 1.1rem;
+        min-width: auto;
+    }
+
+    .today-btn {
+        display: none;
+    }
+
+    .month-body {
+        grid-template-columns: 1fr;
+        /* Switch to list view effectively logic handled in JS preferably, but css fallback */
+    }
+
+    .view-switcher {
+        display: none;
+        /* Hide toggle on very small screens, defaulting to Day/List usually */
+    }
+}
