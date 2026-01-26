@@ -294,7 +294,7 @@ const getCrmScraper = () => {
 };
 
 // Estado mutável do modo CRM (pode ser alterado em runtime)
-let currentCrmMode = process.env.CRM_MODE || 'MOCK';
+let currentCrmMode = process.env.CRM_MODE || 'CONSULTARIO';
 
 app.get('/api/crm/consulta', async (req, res) => {
   const { crm, uf } = req.query;
