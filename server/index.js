@@ -592,8 +592,8 @@ app.post('/api/localizacao/executar-verificacoes', async (req, res) => {
 // Gerar QR Code para conexão
 app.post('/api/whatsapp/conectar', async (req, res) => {
   try {
-    const { gestor_id } = req.body;
-    const resultado = await whatsapp.gerarQRCode(gestor_id);
+    const { gestor_id, api_config } = req.body;
+    const resultado = await whatsapp.gerarQRCode(gestor_id, api_config);
     res.json(resultado);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -631,8 +631,8 @@ app.post('/api/whatsapp/desconectar', async (req, res) => {
 // Criar grupo
 app.post('/api/whatsapp/grupos', async (req, res) => {
   try {
-    const { gestor_id, descricao } = req.body;
-    const resultado = await whatsapp.criarGrupo(gestor_id, descricao);
+    const { gestor_id, nome } = req.body;
+    const resultado = await whatsapp.criarGrupo(gestor_id, nome);
     res.json(resultado);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -702,11 +702,11 @@ app.get('/api/whatsapp/mensagens', (req, res) => {
   const params = [];
 
   if (grupo_id) {
-    query += ' AND grupo_id = ?';
+    query += ' AND destino_id = ? AND tipo = "grupo"';
     params.push(grupo_id);
   }
   if (funcionario_id) {
-    query += ' AND destino_id = ?';
+    query += ' AND destino_id = ? AND tipo = "pessoal"';
     params.push(funcionario_id);
   }
   query += ' ORDER BY created_at DESC LIMIT ?';
