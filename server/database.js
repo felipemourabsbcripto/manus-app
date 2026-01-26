@@ -38,12 +38,18 @@ db.exec(`
 `);
 
 
-// Migration para adicionar senha em bancos existentes
+// Migrations para bancos existentes
 try {
   db.exec("ALTER TABLE funcionarios ADD COLUMN senha TEXT");
-} catch (err) {
-  // Coluna já existe, ignorar
-}
+} catch (err) { }
+
+try {
+  db.exec("ALTER TABLE funcionarios ADD COLUMN unidade_id TEXT");
+} catch (err) { }
+
+try {
+  db.exec("ALTER TABLE funcionarios ADD COLUMN foto_url TEXT");
+} catch (err) { }
 
 // Criar usuário Admin padrão se não existir nenhum funcionário
 const adminExiste = db.prepare("SELECT COUNT(*) as count FROM funcionarios WHERE email = 'felipemouragestor@outlook.com'").get();

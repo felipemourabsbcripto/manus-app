@@ -61,6 +61,8 @@ const ESPECIALIDADES = [
 ];
 
 function Funcionarios() {
+  const [funcionarios, setFuncionarios] = useState([]);
+  const [gestores, setGestores] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
