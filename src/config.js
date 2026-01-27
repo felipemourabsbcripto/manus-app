@@ -7,8 +7,10 @@ const getApiUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     
-    // Produção AWS - mesma origem
-    if (hostname.includes('amazonaws.com') || hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+    // Produção - domínio próprio ou AWS
+    if (hostname.includes('escalaprohscmbh.com.br') || 
+        hostname.includes('amazonaws.com') || 
+        hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
       return '/api';
     }
     
