@@ -387,12 +387,30 @@ app.get('/api/crm/consulta', async (req, res) => {
     }
     
     try {
-      const response = await fetch(`https://api.consultar.io/v1/crm/${ufClean}/${crmClean}`, {
+      const response = await fetch(`https://consultar.io/api/v1/crm/consultar?uf=${ufClean}&numero_registro=${crmClean}`, {
         headers: { 'Authorization': `Token ${CONSULTARIO_API_KEY}` }
       });
       const data = await response.json();
-      return res.json({ ...data, fonte: 'Consultar.io' });
+      
+      if (data.error) {
+        return res.status(response.status).json({ 
+          error: data.message || 'CRM não encontrado',
+          fonte: 'Consultar.io'
+        });
+      }
+      
+      return res.json({
+        nome: data.nome_razao_social,
+        crm: data.numero_registro,
+        uf: data.uf,
+        situacao: data.situacao,
+        especialidade: data.especialidades || '',
+        tipoInscricao: data.tipo_inscricao,
+        categoria: data.categoria,
+        fonte: 'Consultar.io'
+      });
     } catch (error) {
+      console.error('❌ Erro Consultar.io:', error);
       return res.status(500).json({ error: 'Erro ao consultar Consultar.io' });
     }
   }
