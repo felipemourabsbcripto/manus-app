@@ -277,7 +277,7 @@ app.post('/api/auth/apple/callback', async (req, res) => {
 // https://sistemas.cfm.org.br/listamedicos/informacoes
 // Email: webservice@portalmedico.org.br | Tel: (61) 3770-3594
 
-const CONSULTARIO_API_KEY = process.env.CONSULTARIO_KEY || '';
+const CONSULTARIO_API_KEY = process.env.CONSULTARIO_KEY || 'eaea57f17a96235b067cd0ffaefc8801fa737603';
 const CFM_WEBSERVICE_KEY = process.env.CFM_WEBSERVICE_KEY || '';
 
 // Importar scraper (lazy loading)
