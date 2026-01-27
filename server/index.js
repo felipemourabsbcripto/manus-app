@@ -266,32 +266,10 @@ app.post('/api/auth/apple/callback', async (req, res) => {
 
 
 // ============ CONSULTA CRM ============
-// Modos disponíveis:
-//   - MOCK: Simulação local (padrão para desenvolvimento)
-//   - SCRAPER: Web scraping automático do portal CFM (experimental)
-//   - WEBSERVICE: API oficial do CFM (R$ 948/ano para empresas, GRATUITO para hospitais públicos)
-//   - CONSULTARIO: Consultar.io (pago por consulta)
-//
-// RECOMENDAÇÃO PARA SANTA CASA BH:
-// Como entidade filantrópica, solicite acesso GRATUITO ao Webservice CFM:
-// https://sistemas.cfm.org.br/listamedicos/informacoes
-// Email: webservice@portalmedico.org.br | Tel: (61) 3770-3594
+// API oficial: Consultar.io (R$ 0,20 por consulta)
+// Site: https://consultar.io | Painel: https://consultar.io/painel/
 
 const CONSULTARIO_API_KEY = process.env.CONSULTARIO_KEY || 'eaea57f17a96235b067cd0ffaefc8801fa737603';
-const CFM_WEBSERVICE_KEY = process.env.CFM_WEBSERVICE_KEY || '';
-
-// Importar scraper (lazy loading)
-let crmScraper = null;
-const getCrmScraper = () => {
-  if (!crmScraper) {
-    try {
-      crmScraper = require('./crm-scraper');
-    } catch (e) {
-      console.warn('⚠️ CRM Scraper não disponível. Instale puppeteer: npm install puppeteer');
-    }
-  }
-  return crmScraper;
-};
 
 // Estado mutável do modo CRM (pode ser alterado em runtime)
 let currentCrmMode = process.env.CRM_MODE || 'CONSULTARIO';
@@ -319,67 +297,7 @@ app.get('/api/crm/consulta', async (req, res) => {
   console.log(`🔍 Consulta CRM ${crmClean}/${ufClean} - Modo: ${currentCrmMode}`);
 
   // ===================================================
-  // MODO: SCRAPER (Web Scraping Automático CFM)
-  // ===================================================
-  if (currentCrmMode === 'SCRAPER') {
-    const scraper = getCrmScraper();
-    if (!scraper) {
-      return res.status(501).json({ 
-        error: 'Scraper não disponível. Execute: npm install puppeteer',
-        fallback: 'mock'
-      });
-    }
-
-    try {
-      const resultado = await scraper.consultar(crmClean, ufClean);
-      
-      if (resultado.encontrado) {
-        return res.json({
-          nome: resultado.nome,
-          crm: resultado.crm || crmClean,
-          uf: resultado.uf || ufClean,
-          situacao: resultado.situacao || 'Não informado',
-          especialidade: resultado.especialidade || '',
-          tipoInscricao: resultado.tipoInscricao || '',
-          fonte: 'CFM Portal (scraping)'
-        });
-      } else {
-        return res.status(404).json({ 
-          error: resultado.mensagem || 'CRM não encontrado',
-          fonte: 'CFM Portal (scraping)'
-        });
-      }
-    } catch (error) {
-      console.error('❌ Erro no scraper CRM:', error);
-      return res.status(500).json({ error: 'Erro ao consultar CFM' });
-    }
-  }
-
-  // ===================================================
-  // MODO: WEBSERVICE CFM (API Oficial - Paga)
-  // ===================================================
-  if (currentCrmMode === 'WEBSERVICE') {
-    if (!CFM_WEBSERVICE_KEY) {
-      return res.status(501).json({ 
-        error: 'Webservice CFM não configurado. Defina CFM_WEBSERVICE_KEY.',
-        info: 'Custo: R$ 948/ano. https://sistemas.cfm.org.br/listamedicos/informacoes'
-      });
-    }
-    
-    try {
-      // Endpoint exemplo (verificar documentação oficial)
-      const response = await fetch(`https://ws.cfm.org.br/consultamedico?crm=${crmClean}&uf=${ufClean}`, {
-        headers: { 'Authorization': `Bearer ${CFM_WEBSERVICE_KEY}` }
-      });
-      const data = await response.json();
-      return res.json({ ...data, fonte: 'CFM Webservice (oficial)' });
-    } catch (error) {
-      return res.status(500).json({ error: 'Erro ao consultar Webservice CFM' });
-    }
-  }
-
-  // ===================================================
-  // MODO: CONSULTAR.IO (API Externa - Paga)
+  // MODO: CONSULTAR.IO (API Oficial - Paga R$ 0,20/consulta)
   // ===================================================
   if (currentCrmMode === 'CONSULTARIO') {
     if (!CONSULTARIO_API_KEY) {
@@ -443,42 +361,24 @@ app.get('/api/crm/consulta', async (req, res) => {
 
 // ============ CRM - CONFIGURAÇÃO E STATUS ============
 app.get('/api/crm/config', (req, res) => {
-  const scraper = getCrmScraper();
-  
   res.json({
     modoAtual: currentCrmMode,
-    modosDisponiveis: ['MOCK', 'SCRAPER', 'WEBSERVICE', 'CONSULTARIO'],
-    scraperDisponivel: !!scraper,
-    webserviceConfigurado: !!CFM_WEBSERVICE_KEY,
+    modosDisponiveis: ['MOCK', 'CONSULTARIO'],
     consultarioConfigurado: !!CONSULTARIO_API_KEY,
-    cacheStats: scraper ? scraper.estatisticasCache() : null,
     custos: {
       MOCK: 'Gratuito (dados simulados)',
-      SCRAPER: 'Gratuito (web scraping do CFM)',
-      WEBSERVICE: 'R$ 948/ano (API oficial CFM)',
-      CONSULTARIO: 'Por consulta (Consultar.io)'
-    }
+      CONSULTARIO: 'R$ 0,20 por consulta (Consultar.io)'
+    },
+    recarregar: 'https://consultar.io/painel/'
   });
 });
 
 app.post('/api/crm/config', (req, res) => {
   const { modo } = req.body;
   
-  const modosValidos = ['MOCK', 'SCRAPER', 'WEBSERVICE', 'CONSULTARIO'];
+  const modosValidos = ['MOCK', 'CONSULTARIO'];
   if (!modosValidos.includes(modo)) {
     return res.status(400).json({ error: `Modo inválido. Use: ${modosValidos.join(', ')}` });
-  }
-  
-  // Verificações de pré-requisitos
-  if (modo === 'SCRAPER') {
-    const scraper = getCrmScraper();
-    if (!scraper) {
-      return res.status(400).json({ error: 'Puppeteer não instalado. Execute: npm install puppeteer' });
-    }
-  }
-  
-  if (modo === 'WEBSERVICE' && !CFM_WEBSERVICE_KEY) {
-    return res.status(400).json({ error: 'CFM_WEBSERVICE_KEY não configurada' });
   }
   
   if (modo === 'CONSULTARIO' && !CONSULTARIO_API_KEY) {
@@ -493,17 +393,6 @@ app.post('/api/crm/config', (req, res) => {
     modoAtual: currentCrmMode,
     mensagem: `Modo de consulta CRM alterado para ${modo}`
   });
-});
-
-// Limpar cache do scraper
-app.post('/api/crm/cache/limpar', (req, res) => {
-  const scraper = getCrmScraper();
-  if (scraper) {
-    scraper.limparCache();
-    res.json({ success: true, mensagem: 'Cache limpo com sucesso' });
-  } else {
-    res.status(400).json({ error: 'Scraper não disponível' });
-  }
 });
 
 // ============ FUNCIONÁRIOS / MÉDICOS ============
