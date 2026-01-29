@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, Clock, AlertTriangle,
-  DollarSign, Bell, Settings, Star, MessageSquare, MapPin, FileText, LogOut, Heart, Menu, X
+  DollarSign, Bell, Settings, MessageSquare, FileText, LogOut, Heart, Menu, X
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Funcionarios from './pages/Funcionarios';
@@ -42,20 +42,23 @@ const AppLayout = () => {
   const { logout, user } = useAuth();
 
   useEffect(() => {
+    const fetchAvisosNaoLidos = async () => {
+      try {
+        const res = await fetch(`${API_URL}/avisos?lido=false`);
+        const data = await res.json();
+        setAvisosNaoLidos(data.length);
+      } catch (error) {
+        console.error('Erro ao buscar avisos:', error);
+      }
+    };
+
     fetchAvisosNaoLidos();
     const interval = setInterval(fetchAvisosNaoLidos, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchAvisosNaoLidos = async () => {
-    try {
-      const res = await fetch(`${API_URL}/avisos?lido=false`);
-      const data = await res.json();
-      setAvisosNaoLidos(data.length);
-    } catch (error) {
-      console.error('Erro ao buscar avisos:', error);
-    }
-  };
+  // Badge de avisos não lidos (usado no futuro)
+  const _avisosCount = avisosNaoLidos;
 
   return (
     <div className="app-container">
@@ -83,9 +86,10 @@ const AppLayout = () => {
         )}
         <div className="logo">
           <div className="logo-icon">
-            <img src={logo} alt="Santa Casa BH" />
+            <img src={logo} alt="Hospital Santa Casa BH" />
           </div>
           <div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Hospital</span>
             <h1>Santa Casa BH</h1>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>GESTÃO DE PLANTÕES</span>
           </div>
@@ -109,12 +113,12 @@ const AppLayout = () => {
 
           <NavLink to="/presencas" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Clock />
-            <span>Presenças</span>
+            <span>Plantões</span>
           </NavLink>
 
           <NavLink to="/furos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <AlertTriangle />
-            <span>Furos e Faltas</span>
+            <span>Atrasos e Ausências</span>
           </NavLink>
 
           <NavLink to="/pagamentos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>

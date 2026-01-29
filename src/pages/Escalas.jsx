@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Calendar, Plus, Clock, ChevronLeft, ChevronRight, MapPin,
   MoreVertical, Search, Filter, User, X
@@ -20,7 +20,6 @@ function Escalas() {
   const [dataAtual, setDataAtual] = useState(new Date());
   const [visualizacao, setVisualizacao] = useState('mes'); // 'mes', 'semana', 'dia'
   const [showModal, setShowModal] = useState(false);
-  const [selectedDay, setSelectedDay] = useState(null);
 
   // Estados para Modal de Criação (simplificado para o exemplo)
   const [form, setForm] = useState({
@@ -41,11 +40,7 @@ function Escalas() {
     { valor: 6, nome: 'Sáb' }
   ];
 
-  useEffect(() => {
-    fetchDados();
-  }, [dataAtual, visualizacao]);
-
-  const fetchDados = async () => {
+  const fetchDados = useCallback(async () => {
     try {
       let inicio, fim;
       if (visualizacao === 'mes') {
@@ -80,7 +75,11 @@ function Escalas() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dataAtual, visualizacao]);
+
+  useEffect(() => {
+    fetchDados();
+  }, [fetchDados]);
 
   const navegar = (direcao) => {
     if (visualizacao === 'mes') {
@@ -374,7 +373,7 @@ function Escalas() {
 
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label className="form-label">Funcionário *</label>
+                <label className="form-label">Colaborador *</label>
                 <select
                   className="form-select"
                   value={form.funcionario_id}

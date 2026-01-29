@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, Mail, User, Phone, ChevronRight, Loader2, Heart } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import './Login.css';
+import logo from '../assets/logo-login-new.jpg';
 
 export default function Register() {
     const [nome, setNome] = useState('');
@@ -27,7 +29,6 @@ export default function Register() {
 
             if (response.ok) {
                 setCrmData(data);
-                // Opcional: Auto-preencher nome se vazio
                 if (!nome) setNome(data.nome);
                 setError('');
             } else {
@@ -63,195 +64,180 @@ export default function Register() {
     };
 
     return (
-        <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            background: 'radial-gradient(circle at top right, #1e1b4b, #020617)',
-            padding: '1.5rem',
-            position: 'relative',
-            overflow: 'hidden'
-        }}>
-            {/* Elementos decorativos de fundo */}
-            <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '40%', height: '40%', background: 'var(--glow)', filter: 'blur(120px)', borderRadius: '50%', opacity: 0.5 }}></div>
-            <div style={{ position: 'absolute', bottom: '-10%', right: '-10%', width: '40%', height: '40%', background: 'var(--glow)', filter: 'blur(120px)', borderRadius: '50%', opacity: 0.3 }}></div>
-
-            <div className="card" style={{
-                width: '100%',
-                maxWidth: '480px',
-                padding: '3rem',
-                border: '1px solid var(--border)',
-                backdropFilter: 'blur(20px)',
-                background: 'rgba(15, 23, 42, 0.6)',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                zIndex: 1
-            }}>
-                <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-                    <div style={{
-                        display: 'inline-flex',
-                        padding: '1.25rem',
-                        borderRadius: '1.5rem',
-                        background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
-                        marginBottom: '1.5rem',
-                        boxShadow: '0 0 30px var(--glow)'
-                    }}>
-                        <Heart size={40} fill="white" color="white" />
-                    </div>
-                    <h1 style={{
-                        fontSize: '2rem',
-                        fontWeight: 800,
-                        marginBottom: '0.5rem',
-                        letterSpacing: '-0.03em',
-                        background: 'linear-gradient(to right, #ffffff, #94a3b8)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent'
-                    }}>Seja bem-vindo</h1>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 500 }}>Solicite seu acesso ao sistema</p>
+        <div className="login-container">
+            <div className="login-card" style={{ maxWidth: '480px' }}>
+                {/* Header / Logo */}
+                <div className="logo-wrapper">
+                    <img
+                        src={logo}
+                        alt="Hospital Santa Casa BH"
+                        className="logo-img"
+                    />
+                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block' }}>Hospital</span>
+                    <h2 className="institution-name">Santa Casa BH</h2>
                 </div>
 
+                <h1 className="login-title">Solicitar Acesso</h1>
+                <p className="login-subtitle">Preencha seus dados para criar sua conta</p>
+
                 {error && (
-                    <div className="alert alert-danger" style={{ marginBottom: '1.5rem', fontSize: '0.9rem', borderRadius: '0.75rem' }}>
+                    <div style={{
+                        marginBottom: '1rem',
+                        padding: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        borderRadius: '8px',
+                        color: '#ef4444'
+                    }}>
                         <span>{error}</span>
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Nome Completo</label>
-                        <div style={{ position: 'relative' }}>
-                            <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                            <input
-                                type="text"
-                                className="form-input"
-                                style={{ paddingLeft: '3rem', height: '3.5rem' }}
-                                placeholder="Seu nome"
-                                value={nome}
-                                onChange={(e) => setNome(e.target.value)}
-                                required
-                            />
-                        </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="input-group">
+                        <label className="input-label" htmlFor="nome">Nome Completo</label>
+                        <input
+                            id="nome"
+                            type="text"
+                            className="input-field"
+                            placeholder="Seu nome completo"
+                            value={nome}
+                            onChange={(e) => setNome(e.target.value)}
+                            required
+                        />
                     </div>
 
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label">E-mail Corporativo</label>
-                        <div style={{ position: 'relative' }}>
-                            <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                            <input
-                                type="email"
-                                className="form-input"
-                                style={{ paddingLeft: '3rem', height: '3.5rem' }}
-                                placeholder="seu.e-mail@santacasabh.com.br"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
-                        </div>
+                    <div className="input-group">
+                        <label className="input-label" htmlFor="email">Email Corporativo</label>
+                        <input
+                            id="email"
+                            type="email"
+                            className="input-field"
+                            placeholder="seu.nome@santacasabh.com.br"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">CRM</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '1rem', marginBottom: '20px' }}>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label className="input-label" htmlFor="crm">CRM</label>
                             <input
+                                id="crm"
                                 type="text"
-                                className="form-input"
-                                style={{ height: '3.5rem' }}
+                                className="input-field"
                                 placeholder="123456"
                                 value={crm}
                                 onChange={(e) => setCrm(e.target.value)}
                                 onBlur={verificarCRM}
                             />
                         </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">UF</label>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label className="input-label" htmlFor="uf">UF</label>
                             <select
-                                className="form-input"
-                                style={{ height: '3.5rem' }}
+                                id="uf"
+                                className="input-field"
                                 value={uf}
                                 onChange={(e) => setUf(e.target.value)}
+                                style={{ height: '52px' }}
                             >
-                                <option value="MG">MG</option>
-                                <option value="SP">SP</option>
-                                <option value="RJ">RJ</option>
-                                <option value="ES">ES</option>
+                                <option value="AC">AC</option>
+                                <option value="AL">AL</option>
+                                <option value="AP">AP</option>
+                                <option value="AM">AM</option>
                                 <option value="BA">BA</option>
+                                <option value="CE">CE</option>
+                                <option value="DF">DF</option>
+                                <option value="ES">ES</option>
+                                <option value="GO">GO</option>
+                                <option value="MA">MA</option>
+                                <option value="MT">MT</option>
+                                <option value="MS">MS</option>
+                                <option value="MG">MG</option>
+                                <option value="PA">PA</option>
+                                <option value="PB">PB</option>
+                                <option value="PR">PR</option>
+                                <option value="PE">PE</option>
+                                <option value="PI">PI</option>
+                                <option value="RJ">RJ</option>
+                                <option value="RN">RN</option>
+                                <option value="RS">RS</option>
+                                <option value="RO">RO</option>
+                                <option value="RR">RR</option>
+                                <option value="SC">SC</option>
+                                <option value="SP">SP</option>
+                                <option value="SE">SE</option>
+                                <option value="TO">TO</option>
                             </select>
                         </div>
                     </div>
 
                     {crmData && (
-                        <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '0.85rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <div style={{ 
+                            padding: '0.75rem', 
+                            background: 'rgba(16, 185, 129, 0.1)', 
+                            borderRadius: '8px', 
+                            border: '1px solid rgba(16, 185, 129, 0.3)', 
+                            fontSize: '0.85rem', 
+                            display: 'flex', 
+                            gap: '0.5rem', 
+                            alignItems: 'center',
+                            marginBottom: '20px'
+                        }}>
                             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></div>
                             <div>
                                 <strong style={{ color: '#10b981', display: 'block' }}>CRM Válido</strong>
-                                <span style={{ color: 'var(--text-secondary)' }}>{crmData.nome} - {crmData.especialidade}</span>
+                                <span style={{ color: '#64748b' }}>{crmData.nome} - {crmData.especialidade}</span>
                             </div>
                         </div>
                     )}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">WhatsApp</label>
-                            <div style={{ position: 'relative' }}>
-                                <Phone size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                                <input
-                                    type="tel"
-                                    className="form-input"
-                                    style={{ paddingLeft: '3rem', height: '3.5rem' }}
-                                    placeholder="(31) 9..."
-                                    value={telefone}
-                                    onChange={(e) => setTelefone(e.target.value)}
-                                />
-                            </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '20px' }}>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label className="input-label" htmlFor="telefone">WhatsApp</label>
+                            <input
+                                id="telefone"
+                                type="tel"
+                                className="input-field"
+                                placeholder="(31) 99999-9999"
+                                value={telefone}
+                                onChange={(e) => setTelefone(e.target.value)}
+                            />
                         </div>
-
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">Senha</label>
-                            <div style={{ position: 'relative' }}>
-                                <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                                <input
-                                    type="password"
-                                    className="form-input"
-                                    style={{ paddingLeft: '3rem', height: '3.5rem' }}
-                                    placeholder="••••••••"
-                                    value={senha}
-                                    onChange={(e) => setSenha(e.target.value)}
-                                    required
-                                />
-                            </div>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label className="input-label" htmlFor="senha">Senha</label>
+                            <input
+                                id="senha"
+                                type="password"
+                                className="input-field"
+                                placeholder="••••••••"
+                                value={senha}
+                                onChange={(e) => setSenha(e.target.value)}
+                                required
+                            />
                         </div>
                     </div>
 
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        style={{ width: '100%', justifyContent: 'center', height: '3.5rem', marginTop: '0.5rem', fontSize: '1rem' }}
-                        disabled={loading}
-                    >
+                    <button type="submit" className="btn-login" disabled={loading}>
                         {loading ? (
-                            <Loader2 size={24} className="spinner" style={{ borderTopColor: 'white' }} />
+                            <Loader2 size={24} className="spinner" />
                         ) : (
-                            <>
-                                <span>Criar minha conta</span>
-                                <ChevronRight size={20} />
-                            </>
+                            <span>Criar minha conta</span>
                         )}
                     </button>
                 </form>
 
-                <div style={{ marginTop: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    Já tem acesso? <Link to="/login" style={{ color: 'var(--primary)', fontWeight: 700, textDecoration: 'none' }}>Fazer Login</Link>
+                <div className="footer-link">
+                    Já tem acesso? <Link to="/login">Fazer Login</Link>
                 </div>
 
-                <div style={{
-                    marginTop: '3.5rem',
-                    textAlign: 'center',
-                    fontSize: '0.75rem',
-                    color: 'var(--secondary)',
-                    opacity: 0.6
-                }}>
-                    &copy; {new Date().getFullYear()} Santa Casa Belo Horizonte.<br />
-                    Plataforma de Gestão Médica.
+                <div className="app-footer" style={{ fontSize: '12px', color: '#94a3b8', width: '100%', marginTop: '1.5rem' }}>
+                    &copy; 2026 Hospital Santa Casa BH
                 </div>
             </div>
         </div>

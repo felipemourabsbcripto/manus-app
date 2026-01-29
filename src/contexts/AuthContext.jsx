@@ -1,21 +1,24 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useState, useContext } from 'react';
 
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        // Verificar se existe usuário salvo no localStorage
+    // Inicializar estado com valores do localStorage
+    const [user, setUser] = useState(() => {
         const storedUser = localStorage.getItem('@ManusApp:user');
         const storedToken = localStorage.getItem('@ManusApp:token');
-
         if (storedUser && storedToken) {
-            setUser(JSON.parse(storedUser));
+            try {
+                return JSON.parse(storedUser);
+            } catch {
+                return null;
+            }
         }
-        setLoading(false);
-    }, []);
+        return null;
+    });
+    // loading mantido para compatibilidade com componentes que o utilizam
+    const loading = false;
 
     const loginSocial = async ({ provider, token, profile }) => {
         try {

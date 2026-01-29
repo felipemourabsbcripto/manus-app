@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Users, Calendar, AlertTriangle, DollarSign, Bell, Clock,
-  CheckCircle, XCircle, AlertCircle, ArrowRight, Heart
+  CheckCircle, XCircle, AlertCircle, ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { API_URL } from '../config';
-import logo from '../assets/logo-login.png';
-
 import { useAuth } from '../contexts/AuthContext';
 
 function Dashboard() {
@@ -49,8 +48,8 @@ function Dashboard() {
     const statusConfig = {
       presente: { class: 'badge-success', icon: CheckCircle, text: 'Presente' },
       atraso: { class: 'badge-warning', icon: AlertCircle, text: 'Atraso' },
-      furo: { class: 'badge-danger', icon: XCircle, text: 'Furo' },
-      falta: { class: 'badge-danger', icon: XCircle, text: 'Falta' },
+      furo: { class: 'badge-danger', icon: XCircle, text: 'Ausência' },
+      falta: { class: 'badge-danger', icon: XCircle, text: 'Ausência' },
       pendente: { class: 'badge-secondary', icon: Clock, text: 'Pendente' },
       agendado: { class: 'badge-info', icon: Calendar, text: 'Agendado' }
     };
@@ -125,7 +124,7 @@ function Dashboard() {
           </div>
           <div className="stat-info">
             <h3>{dashboard?.furos_hoje || 0}</h3>
-            <p>Furos Hoje</p>
+            <p>Ausências Hoje</p>
           </div>
         </div>
 
@@ -178,9 +177,9 @@ function Dashboard() {
               <p>Tranquilo por aqui. Nenhuma escala agendada no momento.</p>
             </div>
           )}
-          <button className="btn btn-secondary" style={{ width: '100%', marginTop: '1.5rem', justifyContent: 'center' }}>
+          <Link to="/escalas" className="btn btn-secondary" style={{ width: '100%', marginTop: '1.5rem', justifyContent: 'center', textDecoration: 'none' }}>
             Ver Escala Completa <ArrowRight size={18} />
-          </button>
+          </Link>
         </div>
 
         {/* Lado Direito: Alertas e Financeiro */}
@@ -192,7 +191,7 @@ function Dashboard() {
             </div>
             {dashboard?.furos_hoje > 0 ? (
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Existem <strong>{dashboard.furos_hoje} furos</strong> detectados hoje que precisam de remanejamento imediato.
+                Existem <strong>{dashboard.furos_hoje} ausências</strong> detectadas hoje que precisam de remanejamento imediato.
               </p>
             ) : (
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Tudo em ordem. Nenhum plantão descoberto hoje.</p>

@@ -73,8 +73,8 @@ function Furos() {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      furo: { class: 'badge-danger', text: 'Furo' },
-      falta: { class: 'badge-danger', text: 'Falta' },
+      furo: { class: 'badge-danger', text: 'Ausência' },
+      falta: { class: 'badge-danger', text: 'Ausência' },
       atraso: { class: 'badge-warning', text: 'Atraso' }
     };
     const config = statusConfig[status] || { class: 'badge-secondary', text: status };
@@ -98,8 +98,8 @@ function Furos() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Controle de Furos</h1>
-          <p className="page-subtitle">Monitore e gerencie ausências e atrasos</p>
+          <h1 className="page-title">Atrasos e Ausências</h1>
+          <p className="page-subtitle">Monitorar e gerenciar os atrasos e ausências</p>
         </div>
       </div>
 
@@ -120,18 +120,8 @@ function Furos() {
             <XCircle size={24} />
           </div>
           <div className="stat-info">
-            <h3>{estatisticas.furos}</h3>
-            <p>Furos</p>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon red">
-            <XCircle size={24} />
-          </div>
-          <div className="stat-info">
-            <h3>{estatisticas.faltas}</h3>
-            <p>Faltas</p>
+            <h3>{(estatisticas.furos || 0) + (estatisticas.faltas || 0)}</h3>
+            <p>Ausências</p>
           </div>
         </div>
         
@@ -150,7 +140,7 @@ function Furos() {
       <div className="card mb-3">
         <div className="form-row">
           <div className="form-group">
-            <label className="form-label">Data Início</label>
+            <label className="form-label">Data Inicial</label>
             <input
               type="date"
               className="form-input"
@@ -159,7 +149,7 @@ function Furos() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Data Fim</label>
+            <label className="form-label">Data Final</label>
             <input
               type="date"
               className="form-input"
@@ -183,7 +173,7 @@ function Furos() {
               <thead>
                 <tr>
                   <th>Data</th>
-                  <th>Funcionário</th>
+                  <th>Colaborador</th>
                   <th>Horário Esperado</th>
                   <th>Contato</th>
                   <th>Status</th>
@@ -244,7 +234,7 @@ function Furos() {
         ) : (
           <div className="empty-state">
             <CheckCircle size={64} />
-            <p>Nenhum furo registrado no período</p>
+            <p>Nenhuma ocorrência registrada no período</p>
             <span className="text-secondary">Ótimo trabalho da equipe!</span>
           </div>
         )}

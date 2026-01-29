@@ -1,0 +1,57 @@
+# ============================================
+# Docker Compose - Evolution API para WhatsApp
+# ============================================
+# 
+# Como usar:
+# 1. Execute: docker compose -f docker-compose.evolution.yml up -d
+# 2. Acesse: http://localhost:8080
+# 3. Configure a API Key no Manus App
+#
+# Documentação: https://doc.evolution-api.com/
+
+services:
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: evolution-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # ===== Configurações Básicas =====
+      - SERVER_URL=http://localhost:8080
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=manus-app-whatsapp-key-2024
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      
+      # ===== Configurações de Instância =====
+      - CONFIG_SESSION_PHONE_CLIENT=Manus App
+      - CONFIG_SESSION_PHONE_NAME=Chrome
+      
+      # ===== Banco de Dados (SQLite local - mais simples) =====
+      - DATABASE_ENABLED=false
+      
+      # ===== Redis desabilitado para simplificar =====
+      - CACHE_REDIS_ENABLED=false
+      - CACHE_LOCAL_ENABLED=true
+      
+      # ===== RabbitMQ desabilitado =====
+      - RABBITMQ_ENABLED=false
+      
+      # ===== Logs =====
+      - LOG_LEVEL=ERROR,WARN,INFO
+      - LOG_COLOR=true
+      - LOG_BAILEYS=error
+      
+      # ===== Limpeza automática =====
+      - DEL_INSTANCE=5
+      - DEL_TEMP_INSTANCES=true
+      
+      # ===== Limites =====
+      - QRCODE_LIMIT=10
+      - QRCODE_EXPIRATION_TIME=60
+      
+    volumes:
+      - evolution_data:/evolution/instances
+
+volumes:
+  evolution_data:

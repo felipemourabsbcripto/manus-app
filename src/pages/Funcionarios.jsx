@@ -214,7 +214,7 @@ function Funcionarios() {
       admin: { class: 'badge-danger', text: 'Admin', icon: UserCog },
       gestor: { class: 'badge-warning', text: 'Gestor', icon: UserCog },
       medico: { class: 'badge-info', text: 'Médico', icon: Stethoscope },
-      funcionario: { class: 'badge-secondary', text: 'Funcionário', icon: Users }
+      funcionario: { class: 'badge-secondary', text: 'Colaborador', icon: Users }
     };
     const config = tipos[tipo] || tipos.funcionario;
     const Icon = config.icon;
@@ -226,6 +226,7 @@ function Funcionarios() {
     );
   };
 
+  // eslint-disable-next-line no-unused-vars
   const getGestorNome = (gestorId) => {
     const gestor = gestores.find(g => g.id === gestorId);
     return gestor?.nome || '-';
@@ -243,8 +244,8 @@ function Funcionarios() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Médicos e Gestores</h1>
-          <p className="page-subtitle">Gerencie a equipe de plantão</p>
+          <h1 className="page-title">Médicos e Equipe</h1>
+          <p className="page-subtitle">Gerenciar equipe de plantão</p>
         </div>
         <button className="btn btn-primary" onClick={() => {
           resetForm();
@@ -278,7 +279,7 @@ function Funcionarios() {
               <option value="admin">Admin</option>
               <option value="gestor">Gestores</option>
               <option value="medico">Médicos</option>
-              <option value="funcionario">Funcionários</option>
+              <option value="funcionario">Colaboradores</option>
             </select>
           </div>
           <span className="text-secondary">{funcionariosFiltrados.length} registros</span>

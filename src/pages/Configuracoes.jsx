@@ -64,7 +64,7 @@ function Configuracoes() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Configurações</h1>
-          <p className="page-subtitle">Configure as regras do sistema</p>
+          <p className="page-subtitle">Configurar as regras do sistema</p>
         </div>
       </div>
 
@@ -218,7 +218,7 @@ function Configuracoes() {
             <div className="mb-2">
               <p className="text-secondary text-sm">Funcionalidades</p>
               <ul className="text-sm text-secondary" style={{ marginLeft: '1rem', listStyle: 'disc' }}>
-                <li>Gestão de funcionários</li>
+                <li>Gestão de colaboradores</li>
                 <li>Controle de escalas automatizado</li>
                 <li>Registro de presenças e furos</li>
                 <li>Sistema de notas e avaliações</li>

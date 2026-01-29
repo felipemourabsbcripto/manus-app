@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Bell, AlertTriangle, XCircle, AlertCircle, CheckCircle,
   Clock, Check, CheckCheck, Trash2
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { API_URL } from '../config';
 
@@ -12,11 +12,7 @@ function Avisos() {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('todos');
 
-  useEffect(() => {
-    fetchAvisos();
-  }, [filtro]);
-
-  const fetchAvisos = async () => {
+  const fetchAvisos = useCallback(async () => {
     try {
       let url = `${API_URL}/avisos`;
       if (filtro === 'nao_lidos') url += '?lido=false';
@@ -30,7 +26,11 @@ function Avisos() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtro]);
+
+  useEffect(() => {
+    fetchAvisos();
+  }, [fetchAvisos]);
 
   const marcarComoLido = async (id) => {
     try {
@@ -61,9 +61,9 @@ function Avisos() {
 
   const getTipoBadge = (tipo) => {
     const tipos = {
-      furo: { class: 'badge-danger', text: 'Furo' },
+      furo: { class: 'badge-danger', text: 'Ausência' },
       atraso: { class: 'badge-warning', text: 'Atraso' },
-      falta: { class: 'badge-danger', text: 'Falta' },
+      falta: { class: 'badge-danger', text: 'Ausência' },
       alerta: { class: 'badge-warning', text: 'Alerta' },
       info: { class: 'badge-info', text: 'Info' }
     };
@@ -125,8 +125,8 @@ function Avisos() {
             <XCircle size={24} />
           </div>
           <div className="stat-info">
-            <h3>{avisos.filter(a => a.tipo === 'furo').length}</h3>
-            <p>Furos Reportados</p>
+            <h3>{avisos.filter(a => a.tipo === 'furo' || a.tipo === 'falta').length}</h3>
+            <p>Ausências Reportadas</p>
           </div>
         </div>
         

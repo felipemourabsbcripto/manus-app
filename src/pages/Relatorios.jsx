@@ -99,8 +99,6 @@ function Relatorios() {
     linkElement.click();
   };
 
-  const gestorAtual = gestores.find(g => g.id === gestorSelecionado);
-
   if (loading) {
     return <div className="loading"><div className="spinner"></div></div>;
   }
@@ -110,7 +108,7 @@ function Relatorios() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Relatórios</h1>
-          <p className="page-subtitle">Gere relatórios completos de plantão e presença</p>
+          <p className="page-subtitle">Gerar relatórios de plantões e presenças</p>
         </div>
       </div>
 
@@ -130,7 +128,7 @@ function Relatorios() {
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Período Início</label>
+            <label className="form-label">Data Inicial</label>
             <input
               type="date"
               className="form-input"
@@ -139,7 +137,7 @@ function Relatorios() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Período Fim</label>
+            <label className="form-label">Data Final</label>
             <input
               type="date"
               className="form-input"
@@ -288,7 +286,7 @@ function Relatorios() {
                   <thead>
                     <tr>
                       <th>Data</th>
-                      <th>Funcionário</th>
+                      <th>Colaborador</th>
                       <th>Especialidade</th>
                       <th>Entrada</th>
                       <th>Saída</th>

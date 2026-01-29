@@ -1,9 +1,15 @@
 /**
  * Módulo de Integração WhatsApp
- * Integração REAL com Evolution API
+ * Integração REAL com Evolution API v2
+ * 
+ * Para configurar:
+ * 1. Instale a Evolution API: https://doc.evolution-api.com/
+ * 2. Configure as variáveis no arquivo .env ou via interface
+ * 3. Conecte seu WhatsApp escaneando o QR Code
  */
 
 const { v4: uuidv4 } = require('uuid');
+const fetch = require('node-fetch');
 const db = require('./database');
 
 class WhatsAppService {

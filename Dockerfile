@@ -3,7 +3,14 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Instalar dependências (usando install para evitar erro de lockfile)
+# Instalar dependências de compilação para better-sqlite3
+RUN apk add --no-cache python3 make g++ 
+
+# Pular download do Chrome (não usado em produção)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# Instalar dependências
 COPY package*.json ./
 RUN npm install
 
@@ -19,6 +26,13 @@ RUN npm run build
 FROM node:20-alpine
 
 WORKDIR /app
+
+# Instalar dependências de compilação para better-sqlite3
+RUN apk add --no-cache python3 make g++
+
+# Pular download do Chrome
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Instalar dependências de produção
 COPY package*.json ./

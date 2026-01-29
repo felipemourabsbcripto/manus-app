@@ -2,29 +2,6 @@
 // CONFIGURAÇÕES GERAIS DO ESCALAPRO
 // ============================================
 
-// Detecta automaticamente a URL da API baseado no ambiente
-const getApiUrl = () => {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
-    // Produção - domínio próprio ou AWS
-    if (hostname.includes('escalaprohscmbh.com.br') || 
-        hostname.includes('amazonaws.com') || 
-        hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
-      return '/api';
-    }
-    
-    // Sandbox
-    if (hostname.includes('sandbox')) {
-      const apiHost = hostname.replace(/^\d+-/, '3001-');
-      return `https://${apiHost}/api`;
-    }
-  }
-  
-  // Desenvolvimento local
-  return 'http://localhost:3001/api';
-};
-
 export const API_URL = '/api';
 
 // ============================================
@@ -77,8 +54,8 @@ export const MICROSOFT_TOKEN_URL = `https://login.microsoftonline.com/${MICROSOF
 // ============================================
 // CONFIGURAÇÕES DE WHATSAPP (Evolution API)
 // ============================================
-export const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "http://localhost:8080";
-export const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || "";
+export const EVOLUTION_API_URL = import.meta.env.VITE_EVOLUTION_API_URL || "http://localhost:8080";
+export const EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || "";
 
 // ============================================
 // CONFIGURAÇÕES DO SISTEMA

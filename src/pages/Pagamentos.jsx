@@ -65,7 +65,7 @@ function Pagamentos() {
 
   const calcularPagamento = async () => {
     if (!form.funcionario_id || !form.periodo_inicio || !form.periodo_fim) {
-      alert('Selecione funcionário e período');
+      alert('Selecione colaborador e período');
       return;
     }
     
@@ -165,7 +165,7 @@ function Pagamentos() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Pagamentos</h1>
-          <p className="page-subtitle">Gerencie os pagamentos dos funcionários</p>
+          <p className="page-subtitle">Gerenciar os pagamentos dos colaboradores</p>
         </div>
         <button className="btn btn-primary" onClick={() => {
           resetForm();
@@ -248,7 +248,7 @@ function Pagamentos() {
             <table>
               <thead>
                 <tr>
-                  <th>Funcionário</th>
+                  <th>Colaborador</th>
                   <th>Período</th>
                   <th>Horas</th>
                   <th>Extras</th>
@@ -316,7 +316,7 @@ function Pagamentos() {
             
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label className="form-label">Funcionário *</label>
+                <label className="form-label">Colaborador *</label>
                 <select
                   className="form-select"
                   value={form.funcionario_id}

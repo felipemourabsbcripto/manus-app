@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, Mail, ChevronRight, Loader2, Heart } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { 
     GOOGLE_CLIENT_ID, 
     APPLE_CLIENT_ID, 
@@ -21,6 +21,8 @@ export default function Login() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [googleLoaded, setGoogleLoaded] = useState(false);
+    // appleLoaded usado para controle de carregamento do SDK Apple
+    // eslint-disable-next-line no-unused-vars
     const [appleLoaded, setAppleLoaded] = useState(false);
 
     const { login, loginSocial } = useAuth();
@@ -81,22 +83,9 @@ export default function Login() {
     }, []);
 
     // ===================================================
-    // Inicializar Google Sign-In quando SDK carregar
-    // ===================================================
-    useEffect(() => {
-        if (googleLoaded && window.google && GOOGLE_CLIENT_ID) {
-            window.google.accounts.id.initialize({
-                client_id: GOOGLE_CLIENT_ID,
-                callback: handleGoogleCallback,
-                auto_select: false,
-            });
-        }
-    }, [googleLoaded]);
-
-    // ===================================================
     // Callback do Google Sign-In
     // ===================================================
-    const handleGoogleCallback = async (response) => {
+    const handleGoogleCallback = useCallback(async (response) => {
         setLoading(true);
         setError('');
         
@@ -119,13 +108,25 @@ export default function Login() {
             } else {
                 setError(result.error || 'Falha no login com Google');
             }
-        } catch (err) {
-            console.error('Erro Google Sign-In:', err);
+        } catch {
             setError('Erro ao processar login com Google');
         } finally {
             setLoading(false);
         }
-    };
+    }, [loginSocial, navigate]);
+
+    // ===================================================
+    // Inicializar Google Sign-In quando SDK carregar
+    // ===================================================
+    useEffect(() => {
+        if (googleLoaded && window.google && GOOGLE_CLIENT_ID) {
+            window.google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleGoogleCallback,
+                auto_select: false,
+            });
+        }
+    }, [googleLoaded, handleGoogleCallback]);
 
     // ===================================================
     // Callback do Apple Sign-In
@@ -202,7 +203,7 @@ export default function Login() {
             } else {
                 setError(result.error || 'Falha ao realizar login');
             }
-        } catch (err) {
+        } catch {
             setError('Erro inesperado ao fazer login');
         } finally {
             setLoading(false);
@@ -280,9 +281,10 @@ export default function Login() {
                 <div className="logo-wrapper">
                     <img
                         src={logo}
-                        alt="Santa Casa BH"
+                        alt="Hospital Santa Casa BH"
                         className="logo-img"
                     />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Hospital</span>
                     <h2 className="institution-name">Santa Casa BH</h2>
                 </div>
 

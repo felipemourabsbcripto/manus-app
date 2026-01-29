@@ -27,3 +27,7 @@ server/*.db
 *.zip
 *.pkg
 *.pem
+
+# WhatsApp Web.js session data
+.wwebjs_auth/
+

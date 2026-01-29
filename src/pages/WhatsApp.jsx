@@ -17,6 +17,7 @@ function WhatsApp() {
   const [mensagens, setMensagens] = useState([]);
   const [conexao, setConexao] = useState(null);
   const [supervisores, setSupervisores] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [estatisticas, setEstatisticas] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +27,7 @@ function WhatsApp() {
   const [showModalMensagem, setShowModalMensagem] = useState(false);
   const [showModalConectar, setShowModalConectar] = useState(false);
   const [showModalSupervisor, setShowModalSupervisor] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [showModalEstatisticas, setShowModalEstatisticas] = useState(false);
   const [showModalConfig, setShowModalConfig] = useState(false);
 
@@ -40,6 +42,7 @@ function WhatsApp() {
   });
 
   const [supervisorForm, setSupervisorForm] = useState({ nome: '', whatsapp: '', email: '' });
+  // eslint-disable-next-line no-unused-vars
   const [editandoSupervisor, setEditandoSupervisor] = useState(null);
   const [abaSelecionada, setAbaSelecionada] = useState('grupos');
 
@@ -382,51 +385,78 @@ function WhatsApp() {
 
       {showModalConfig && (
         <div className="modal-overlay" onClick={() => setShowModalConfig(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px' }}>
             <div className="modal-header">
               <h2 className="modal-title">Configurar Evolution API</h2>
               <button className="modal-close" onClick={() => setShowModalConfig(false)}><X size={24} /></button>
             </div>
             <div className="modal-body">
-              <div className="alert alert-info mb-3">
+              <div className="alert alert-info mb-3" style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
                 <Globe size={20} />
-                <span>Configure sua instância da Evolution API v2 para este gestor.</span>
+                <div>
+                  <strong>Evolution API v2</strong>
+                  <p style={{ fontSize: '0.85rem', marginTop: '0.25rem', opacity: 0.9 }}>
+                    Configure sua instância para enviar mensagens via WhatsApp.
+                  </p>
+                </div>
               </div>
+
+              <div style={{ 
+                background: 'var(--bg-tertiary)', 
+                padding: '1rem', 
+                borderRadius: '0.5rem', 
+                marginBottom: '1.5rem',
+                fontSize: '0.85rem'
+              }}>
+                <strong style={{ display: 'block', marginBottom: '0.5rem' }}>📋 Como configurar:</strong>
+                <ol style={{ paddingLeft: '1.25rem', margin: 0, lineHeight: 1.8 }}>
+                  <li>Execute: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>docker-compose -f docker-compose.evolution.yml up -d</code></li>
+                  <li>Use a URL: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>http://localhost:8080</code></li>
+                  <li>API Key: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>manus-app-whatsapp-key-2024</code></li>
+                </ol>
+              </div>
+
               <div className="form-group">
-                <label className="form-label">API URL</label>
+                <label className="form-label">API URL *</label>
                 <input
                   className="form-input"
-                  placeholder="https://api.seuserver.com"
+                  placeholder="http://localhost:8080"
                   value={apiConfig.url}
                   onChange={e => setApiConfig({ ...apiConfig, url: e.target.value })}
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">API Key</label>
+                <label className="form-label">API Key *</label>
                 <input
                   className="form-input"
                   type="password"
-                  placeholder="Seu token apikey"
+                  placeholder="Sua chave de API"
                   value={apiConfig.key}
                   onChange={e => setApiConfig({ ...apiConfig, key: e.target.value })}
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Nome da Instância</label>
+                <label className="form-label">Nome da Instância *</label>
                 <input
                   className="form-input"
-                  placeholder="ex: gestor_felipe"
+                  placeholder="ex: manus-santa-casa"
                   value={apiConfig.instance}
                   onChange={e => setApiConfig({ ...apiConfig, instance: e.target.value })}
                 />
+                <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                  Identificador único para esta conexão WhatsApp
+                </small>
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowModalConfig(false)}>Fechar</button>
+              <button className="btn btn-secondary" onClick={() => setShowModalConfig(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => {
                 handleConectar();
                 setShowModalConfig(false);
-              }}>Salvar e Conectar</button>
+              }}>
+                <Link2 size={18} />
+                Salvar e Conectar
+              </button>
             </div>
           </div>
         </div>

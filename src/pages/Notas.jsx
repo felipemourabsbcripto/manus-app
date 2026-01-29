@@ -10,7 +10,6 @@ function Notas() {
   const [funcionarios, setFuncionarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [showCalcular, setShowCalcular] = useState(false);
   const [notasCalculadas, setNotasCalculadas] = useState(null);
   const [form, setForm] = useState({
     funcionario_id: '',
@@ -68,7 +67,7 @@ function Notas() {
 
   const calcularNotas = async () => {
     if (!form.funcionario_id || !form.periodo_inicio || !form.periodo_fim) {
-      alert('Selecione funcionário e período');
+      alert('Selecione colaborador e período');
       return;
     }
     
@@ -144,7 +143,7 @@ function Notas() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Notas e Avaliações</h1>
-          <p className="page-subtitle">Avalie o desempenho dos funcionários</p>
+          <p className="page-subtitle">Avalie o desempenho dos colaboradores</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={20} />
@@ -264,7 +263,7 @@ function Notas() {
             <table>
               <thead>
                 <tr>
-                  <th>Funcionário</th>
+                  <th>Colaborador</th>
                   <th>Período</th>
                   <th>Pontualidade</th>
                   <th>Assiduidade</th>
@@ -339,7 +338,7 @@ function Notas() {
             
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label className="form-label">Funcionário *</label>
+                <label className="form-label">Colaborador *</label>
                 <select
                   className="form-select"
                   value={form.funcionario_id}

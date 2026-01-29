@@ -115,12 +115,12 @@ function Presencas() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Controle de Presenças</h1>
-          <p className="page-subtitle">Registre e monitore a presença dos funcionários</p>
+          <h1 className="page-title">Controle de Plantões</h1>
+          <p className="page-subtitle">Registrar e monitorar a presença dos colaboradores</p>
         </div>
         <button className="btn btn-warning" onClick={verificarFuros}>
           <RefreshCw size={20} />
-          Verificar Furos
+          Verificar Atrasos
         </button>
       </div>
 
@@ -162,7 +162,7 @@ function Presencas() {
       <div className="card mb-3">
         <div className="form-row">
           <div className="form-group">
-            <label className="form-label">Data Início</label>
+            <label className="form-label">Data Inicial</label>
             <input
               type="date"
               className="form-input"
@@ -171,7 +171,7 @@ function Presencas() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Data Fim</label>
+            <label className="form-label">Data Final</label>
             <input
               type="date"
               className="form-input"
@@ -180,7 +180,7 @@ function Presencas() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Funcionário</label>
+            <label className="form-label">Colaborador</label>
             <select
               className="form-select"
               value={filtros.funcionario_id}
@@ -202,8 +202,7 @@ function Presencas() {
               <option value="">Todos</option>
               <option value="presente">Presente</option>
               <option value="atraso">Atraso</option>
-              <option value="furo">Furo</option>
-              <option value="falta">Falta</option>
+              <option value="falta">Ausência</option>
               <option value="pendente">Pendente</option>
             </select>
           </div>
@@ -223,7 +222,7 @@ function Presencas() {
               <thead>
                 <tr>
                   <th>Data</th>
-                  <th>Funcionário</th>
+                  <th>Colaborador</th>
                   <th>Horário Esperado</th>
                   <th>Entrada</th>
                   <th>Saída</th>

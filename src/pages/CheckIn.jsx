@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   MapPin, LogIn, LogOut, Clock, CheckCircle, XCircle, AlertCircle,
   Navigation, RefreshCw, User, Calendar, Timer
@@ -61,14 +61,23 @@ function CheckIn() {
     }
   };
 
-  useEffect(() => {
-    fetchDados();
-  }, []);
+  const fetchPresencaHoje = useCallback(async () => {
+    try {
+      const hoje = new Date().toISOString().split('T')[0];
+      const res = await fetch(`${API_URL}/presencas?funcionario_id=${funcionarioSelecionado}&data_inicio=${hoje}&data_fim=${hoje}`);
+      const data = await res.json();
+      setPresencaHoje(data[0] || null);
+    } catch (error) {
+      console.error('Erro:', error);
+    }
+  }, [funcionarioSelecionado]);
 
-  useEffect(() => {
-    if (funcionarioSelecionado) {
-      fetchPresencaHoje();
-      fetchHistorico();
+  const fetchHistorico = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/localizacao/historico/${funcionarioSelecionado}`);
+      setHistorico(await res.json());
+    } catch (error) {
+      console.error('Erro:', error);
     }
   }, [funcionarioSelecionado]);
 
@@ -100,25 +109,16 @@ function CheckIn() {
     }
   };
 
-  const fetchPresencaHoje = async () => {
-    try {
-      const hoje = new Date().toISOString().split('T')[0];
-      const res = await fetch(`${API_URL}/presencas?funcionario_id=${funcionarioSelecionado}&data_inicio=${hoje}&data_fim=${hoje}`);
-      const data = await res.json();
-      setPresencaHoje(data[0] || null);
-    } catch (error) {
-      console.error('Erro:', error);
-    }
-  };
+  useEffect(() => {
+    fetchDados();
+  }, []);
 
-  const fetchHistorico = async () => {
-    try {
-      const res = await fetch(`${API_URL}/localizacao/historico/${funcionarioSelecionado}`);
-      setHistorico(await res.json());
-    } catch (error) {
-      console.error('Erro:', error);
+  useEffect(() => {
+    if (funcionarioSelecionado) {
+      fetchPresencaHoje();
+      fetchHistorico();
     }
-  };
+  }, [funcionarioSelecionado, fetchPresencaHoje, fetchHistorico]);
 
   const obterLocalizacao = () => {
     setCarregandoLocalizacao(true);
@@ -298,7 +298,7 @@ function CheckIn() {
       <div className="card mb-3">
         <div className="form-row">
           <div className="form-group" style={{ flex: 2 }}>
-            <label className="form-label">Selecione o Médico/Funcionário</label>
+            <label className="form-label">Selecione o Médico/Colaborador</label>
             <select
               className="form-select"
               value={funcionarioSelecionado}
