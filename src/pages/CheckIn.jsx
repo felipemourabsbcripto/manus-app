@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   MapPin, LogIn, LogOut, Clock, CheckCircle, XCircle, AlertCircle,
-  Navigation, RefreshCw, User, Calendar, Timer
+  Navigation, RefreshCw, User, Calendar, Timer, QrCode, Camera, Scan
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -20,6 +20,15 @@ function CheckIn() {
   const [loading, setLoading] = useState(true);
   const [showModalHoraExtra, setShowModalHoraExtra] = useState(false);
   const [motivoHoraExtra, setMotivoHoraExtra] = useState('');
+  
+  // QR Code states
+  const [modoCheckin, setModoCheckin] = useState('gps'); // 'gps' ou 'qrcode'
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showQRGenerator, setShowQRGenerator] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState(null);
+  const [codigoManual, setCodigoManual] = useState('');
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
   // Função para converter coordenadas em endereço amigável (Geocodificação Reversa)
   const geocodificarReverso = async (latitude, longitude) => {
@@ -259,6 +268,106 @@ function CheckIn() {
     }
   };
 
+  // Check-in via código manual
+  const fazerCheckInCodigo = async () => {
+    if (!codigoManual.trim()) {
+      alert('Por favor, digite o código');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/checkin/codigo-manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          funcionario_id: funcionarioSelecionado,
+          codigo: codigoManual.trim().toUpperCase()
+        })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        alert(`✅ Check-in realizado via código!\n\n` +
+          `🏥 Hospital: ${data.hospital}\n` +
+          `⏰ Hora: ${data.hora}\n` +
+          `📝 Status: ${data.status?.toUpperCase() || 'REGISTRADO'}`);
+        setShowQRGenerator(false);
+        setCodigoManual('');
+        fetchPresencaHoje();
+        fetchHistorico();
+      } else {
+        alert(data.error || 'Código inválido ou expirado');
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      alert('Erro ao fazer check-in');
+    }
+  };
+
+  // Check-in via QR Code escaneado
+  const fazerCheckInQR = async (codigoQR) => {
+    try {
+      const res = await fetch(`${API_URL}/checkin/qrcode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          funcionario_id: funcionarioSelecionado,
+          codigo_qr: codigoQR
+        })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        alert(`✅ Check-in realizado via QR Code!\n\n` +
+          `🏥 Hospital: ${data.hospital}\n` +
+          `⏰ Hora: ${data.hora}`);
+        setShowQRScanner(false);
+        stopCamera();
+        fetchPresencaHoje();
+        fetchHistorico();
+      } else {
+        alert(data.error || 'QR Code inválido');
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      alert('Erro ao fazer check-in');
+    }
+  };
+
+  // Iniciar câmera para escanear QR
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error('Erro ao acessar câmera:', error);
+      alert('Não foi possível acessar a câmera. Verifique as permissões.');
+    }
+  };
+
+  // Parar câmera
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  // Efeito para iniciar/parar câmera
+  useEffect(() => {
+    if (showQRScanner) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [showQRScanner]);
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       presente: { class: 'badge-success', icon: CheckCircle, text: 'Presente' },
@@ -399,6 +508,42 @@ function CheckIn() {
             </div>
           </div>
 
+          {/* Modo de Check-in */}
+          <div className="card mb-3">
+            <div className="card-header">
+              <h2 className="card-title">Modo de Check-in</h2>
+            </div>
+            
+            <div className="flex gap-2 mb-3">
+              <button
+                className={`btn ${modoCheckin === 'gps' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setModoCheckin('gps')}
+              >
+                <MapPin size={18} />
+                GPS (Localização)
+              </button>
+              <button
+                className={`btn ${modoCheckin === 'qrcode' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setModoCheckin('qrcode')}
+              >
+                <QrCode size={18} />
+                QR Code / Código
+              </button>
+            </div>
+
+            {modoCheckin === 'qrcode' && (
+              <div className="alert alert-info">
+                <QrCode size={20} />
+                <div>
+                  <p className="font-semibold">Check-in via QR Code ou Código Manual</p>
+                  <p className="text-sm">
+                    Escaneie o QR Code do hospital ou digite o código diário para registrar presença.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Botões de Ação */}
           <div className="card mb-3">
             <div className="card-header">
@@ -407,14 +552,35 @@ function CheckIn() {
 
             <div className="flex flex-wrap gap-2">
               {!presencaHoje?.hora_entrada && presencaHoje && (
-                <button
-                  className="btn btn-success"
-                  onClick={fazerCheckIn}
-                  disabled={!localizacao}
-                >
-                  <LogIn size={20} />
-                  Fazer Check-in
-                </button>
+                <>
+                  {modoCheckin === 'gps' ? (
+                    <button
+                      className="btn btn-success"
+                      onClick={fazerCheckIn}
+                      disabled={!localizacao}
+                    >
+                      <LogIn size={20} />
+                      Fazer Check-in (GPS)
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="btn btn-success"
+                        onClick={() => setShowQRScanner(true)}
+                      >
+                        <Camera size={20} />
+                        Escanear QR Code
+                      </button>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => setShowQRGenerator(true)}
+                      >
+                        <Scan size={20} />
+                        Digitar Código Manual
+                      </button>
+                    </>
+                  )}
+                </>
               )}
 
               {presencaHoje?.hora_entrada && !presencaHoje?.hora_saida && (
@@ -422,7 +588,7 @@ function CheckIn() {
                   <button
                     className="btn btn-danger"
                     onClick={() => fazerCheckOut(false)}
-                    disabled={!localizacao}
+                    disabled={modoCheckin === 'gps' && !localizacao}
                   >
                     <LogOut size={20} />
                     Fazer Check-out
@@ -431,7 +597,7 @@ function CheckIn() {
                   <button
                     className="btn btn-warning"
                     onClick={() => setShowModalHoraExtra(true)}
-                    disabled={!localizacao}
+                    disabled={modoCheckin === 'gps' && !localizacao}
                   >
                     <Timer size={20} />
                     Check-out com Hora Extra
@@ -462,6 +628,63 @@ function CheckIn() {
                 </div>
               )}
             </div>
+          </div>
+          
+          {/* Seção para Gestores - Gerar Código QR */}
+          <div className="card mb-3">
+            <div className="card-header">
+              <h2 className="card-title">
+                <QrCode size={20} />
+                Gerar Código para Check-in (Gestores)
+              </h2>
+            </div>
+            
+            <div className="form-group">
+              <label className="form-label">Selecione o Hospital</label>
+              <select
+                className="form-select"
+                onChange={async (e) => {
+                  if (e.target.value) {
+                    try {
+                      const res = await fetch(`${API_URL}/hospitais/${e.target.value}/codigo-diario`);
+                      const data = await res.json();
+                      setQrCodeData(data);
+                    } catch (error) {
+                      console.error('Erro:', error);
+                    }
+                  } else {
+                    setQrCodeData(null);
+                  }
+                }}
+              >
+                <option value="">Selecione...</option>
+                {hospitais.map(h => (
+                  <option key={h.id} value={h.id}>{h.nome}</option>
+                ))}
+              </select>
+            </div>
+            
+            {qrCodeData && (
+              <div className="alert alert-success mt-3">
+                <div style={{ textAlign: 'center', width: '100%' }}>
+                  <p className="font-semibold text-xl mb-2">🏥 {qrCodeData.hospital}</p>
+                  <div style={{ 
+                    fontSize: '3rem', 
+                    fontWeight: 'bold', 
+                    fontFamily: 'monospace',
+                    backgroundColor: 'var(--background-primary)',
+                    padding: '20px',
+                    borderRadius: '12px',
+                    letterSpacing: '4px',
+                    marginBottom: '10px'
+                  }}>
+                    {qrCodeData.codigo}
+                  </div>
+                  <p className="text-sm">📅 Válido em: {qrCodeData.data}</p>
+                  <p className="text-xs text-secondary">Válido até {qrCodeData.valido_ate}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Hospitais */}
@@ -578,6 +801,145 @@ function CheckIn() {
               >
                 <Timer size={18} />
                 Registrar e Fazer Check-out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Código Manual */}
+      {showQRGenerator && (
+        <div className="modal-overlay" onClick={() => setShowQRGenerator(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                <Scan size={20} />
+                Digitar Código de Check-in
+              </h2>
+              <button className="modal-close" onClick={() => setShowQRGenerator(false)}>
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            <div className="alert alert-info mb-3">
+              <QrCode size={20} />
+              <div>
+                <p className="font-semibold">Código Diário do Hospital</p>
+                <p className="text-sm">
+                  Digite o código exibido no painel do hospital ou informado pelo gestor.
+                </p>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Código de Check-in</label>
+              <input
+                type="text"
+                className="form-input"
+                value={codigoManual}
+                onChange={e => setCodigoManual(e.target.value.toUpperCase())}
+                placeholder="Ex: SANT2301"
+                style={{ 
+                  fontSize: '1.5rem', 
+                  textAlign: 'center', 
+                  fontFamily: 'monospace',
+                  letterSpacing: '3px'
+                }}
+                maxLength={10}
+              />
+              <p className="text-xs text-secondary mt-1">
+                O código tem formato: [4 letras do hospital] + [DDMM]
+              </p>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowQRGenerator(false)}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-success"
+                onClick={fazerCheckInCodigo}
+                disabled={codigoManual.length < 6}
+              >
+                <LogIn size={18} />
+                Fazer Check-in
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Scanner QR Code */}
+      {showQRScanner && (
+        <div className="modal-overlay" onClick={() => { setShowQRScanner(false); stopCamera(); }}>
+          <div className="modal" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                <Camera size={20} />
+                Escanear QR Code
+              </h2>
+              <button className="modal-close" onClick={() => { setShowQRScanner(false); stopCamera(); }}>
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            <div className="alert alert-info mb-3">
+              <QrCode size={20} />
+              <span>Aponte a câmera para o QR Code do hospital</span>
+            </div>
+
+            <div style={{ 
+              position: 'relative', 
+              width: '100%', 
+              paddingTop: '100%',
+              backgroundColor: '#000',
+              borderRadius: '12px',
+              overflow: 'hidden'
+            }}>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+              />
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '200px',
+                height: '200px',
+                border: '3px solid var(--primary)',
+                borderRadius: '12px',
+                boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)'
+              }} />
+            </div>
+
+            <p className="text-center text-secondary mt-3">
+              Posicione o QR Code dentro da área destacada
+            </p>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => { setShowQRScanner(false); stopCamera(); }}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowQRScanner(false);
+                  stopCamera();
+                  setShowQRGenerator(true);
+                }}
+              >
+                <Scan size={18} />
+                Digitar Código Manualmente
               </button>
             </div>
           </div>

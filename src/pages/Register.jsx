@@ -1,9 +1,41 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import './Login.css';
 import logo from '../assets/logo-login-new.jpg';
+
+// Lista de especialidades médicas
+const ESPECIALIDADES = [
+    'Sem especialidade',
+    'Anestesiologia',
+    'Cardiologia',
+    'Cirurgia Geral',
+    'Cirurgia Plástica',
+    'Clínica Médica',
+    'Dermatologia',
+    'Endocrinologia',
+    'Gastroenterologia',
+    'Geriatria',
+    'Ginecologia e Obstetrícia',
+    'Hematologia',
+    'Infectologia',
+    'Medicina de Emergência',
+    'Medicina Intensiva',
+    'Nefrologia',
+    'Neurologia',
+    'Oftalmologia',
+    'Oncologia',
+    'Ortopedia e Traumatologia',
+    'Otorrinolaringologia',
+    'Pediatria',
+    'Pneumologia',
+    'Psiquiatria',
+    'Radiologia',
+    'Reumatologia',
+    'Urologia',
+    '+ Adicionar outra'
+];
 
 export default function Register() {
     const [nome, setNome] = useState('');
@@ -13,6 +45,14 @@ export default function Register() {
     const [crm, setCrm] = useState('');
     const [uf, setUf] = useState('MG');
     const [crmData, setCrmData] = useState(null);
+    
+    // Novos campos de especialidade
+    const [especialidade, setEspecialidade] = useState('');
+    const [especialidadeCustom, setEspecialidadeCustom] = useState('');
+    const [showCustomEspecialidade, setShowCustomEspecialidade] = useState(false);
+    const [hasRQE, setHasRQE] = useState(false);
+    const [hasPOS, setHasPOS] = useState(false);
+    const [rqeNumero, setRqeNumero] = useState('');
 
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -30,6 +70,16 @@ export default function Register() {
             if (response.ok) {
                 setCrmData(data);
                 if (!nome) setNome(data.nome);
+                // Auto-preencher especialidade se encontrada no CRM
+                if (data.especialidade && !especialidade) {
+                    const found = ESPECIALIDADES.find(e => 
+                        e.toLowerCase().includes(data.especialidade.toLowerCase()) ||
+                        data.especialidade.toLowerCase().includes(e.toLowerCase())
+                    );
+                    if (found && found !== '+ Adicionar outra') {
+                        setEspecialidade(found);
+                    }
+                }
                 setError('');
             } else {
                 setCrmData(null);
@@ -40,19 +90,51 @@ export default function Register() {
         }
     };
 
+    const handleEspecialidadeChange = (value) => {
+        setEspecialidade(value);
+        if (value === '+ Adicionar outra') {
+            setShowCustomEspecialidade(true);
+        } else {
+            setShowCustomEspecialidade(false);
+            setEspecialidadeCustom('');
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        
+        // Validar campos obrigatórios
+        if (!nome.trim()) {
+            setError('Nome é obrigatório');
+            return;
+        }
+        if (!crm.trim()) {
+            setError('CRM é obrigatório');
+            return;
+        }
+        if (!telefone.trim()) {
+            setError('WhatsApp é obrigatório');
+            return;
+        }
+        
         setLoading(true);
+
+        // Determinar especialidade final
+        const especialidadeFinal = showCustomEspecialidade 
+            ? especialidadeCustom 
+            : (especialidade === 'Sem especialidade' ? '' : especialidade);
 
         const result = await register({
             nome,
-            email,
-            senha,
+            email: email || null,
+            senha: senha || null,
             telefone,
             crm,
             uf,
-            especialidade: crmData?.especialidade
+            especialidade: especialidadeFinal || crmData?.especialidade || '',
+            rqe: hasRQE ? rqeNumero : null,
+            pos_graduacao: hasPOS
         });
 
         if (result.success) {
@@ -99,7 +181,7 @@ export default function Register() {
 
                 <form onSubmit={handleSubmit}>
                     <div className="input-group">
-                        <label className="input-label" htmlFor="nome">Nome Completo</label>
+                        <label className="input-label" htmlFor="nome">Nome Completo *</label>
                         <input
                             id="nome"
                             type="text"
@@ -111,22 +193,10 @@ export default function Register() {
                         />
                     </div>
 
-                    <div className="input-group">
-                        <label className="input-label" htmlFor="email">Email Corporativo</label>
-                        <input
-                            id="email"
-                            type="email"
-                            className="input-field"
-                            placeholder="seu.nome@santacasabh.com.br"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                    </div>
-
+                    {/* CRM e UF - Obrigatórios */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '1rem', marginBottom: '20px' }}>
                         <div className="input-group" style={{ marginBottom: 0 }}>
-                            <label className="input-label" htmlFor="crm">CRM</label>
+                            <label className="input-label" htmlFor="crm">CRM *</label>
                             <input
                                 id="crm"
                                 type="text"
@@ -135,6 +205,7 @@ export default function Register() {
                                 value={crm}
                                 onChange={(e) => setCrm(e.target.value)}
                                 onBlur={verificarCRM}
+                                required
                             />
                         </div>
                         <div className="input-group" style={{ marginBottom: 0 }}>
@@ -197,30 +268,127 @@ export default function Register() {
                         </div>
                     )}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '20px' }}>
-                        <div className="input-group" style={{ marginBottom: 0 }}>
-                            <label className="input-label" htmlFor="telefone">WhatsApp</label>
+                    {/* Especialidade - Opcional */}
+                    <div className="input-group">
+                        <label className="input-label" htmlFor="especialidade">Especialidade (opcional)</label>
+                        <select
+                            id="especialidade"
+                            className="input-field"
+                            value={especialidade}
+                            onChange={(e) => handleEspecialidadeChange(e.target.value)}
+                            style={{ height: '52px' }}
+                        >
+                            <option value="">Selecione uma especialidade...</option>
+                            {ESPECIALIDADES.map(esp => (
+                                <option key={esp} value={esp}>{esp}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Campo customizado para especialidade */}
+                    {showCustomEspecialidade && (
+                        <div className="input-group">
+                            <label className="input-label" htmlFor="especialidadeCustom">
+                                <Plus size={14} style={{ marginRight: '4px', display: 'inline' }} />
+                                Digite sua especialidade
+                            </label>
                             <input
-                                id="telefone"
-                                type="tel"
+                                id="especialidadeCustom"
+                                type="text"
                                 className="input-field"
-                                placeholder="(31) 99999-9999"
-                                value={telefone}
-                                onChange={(e) => setTelefone(e.target.value)}
+                                placeholder="Ex: Medicina do Esporte"
+                                value={especialidadeCustom}
+                                onChange={(e) => setEspecialidadeCustom(e.target.value)}
                             />
                         </div>
-                        <div className="input-group" style={{ marginBottom: 0 }}>
-                            <label className="input-label" htmlFor="senha">Senha</label>
+                    )}
+
+                    {/* RQE e PÓS - Opcionais */}
+                    <div style={{ 
+                        display: 'flex', 
+                        gap: '1.5rem', 
+                        marginBottom: '20px',
+                        padding: '1rem',
+                        background: 'rgba(99, 102, 241, 0.05)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(99, 102, 241, 0.1)'
+                    }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
                             <input
-                                id="senha"
-                                type="password"
+                                type="checkbox"
+                                checked={hasRQE}
+                                onChange={(e) => setHasRQE(e.target.checked)}
+                                style={{ width: '18px', height: '18px', accentColor: '#6366f1' }}
+                            />
+                            <span style={{ color: '#334155', fontWeight: 500 }}>RQE</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                            <input
+                                type="checkbox"
+                                checked={hasPOS}
+                                onChange={(e) => setHasPOS(e.target.checked)}
+                                style={{ width: '18px', height: '18px', accentColor: '#6366f1' }}
+                            />
+                            <span style={{ color: '#334155', fontWeight: 500 }}>Pós-Graduação</span>
+                        </label>
+                    </div>
+
+                    {/* Campo RQE número - aparece se marcou RQE */}
+                    {hasRQE && (
+                        <div className="input-group">
+                            <label className="input-label" htmlFor="rqeNumero">Número do RQE</label>
+                            <input
+                                id="rqeNumero"
+                                type="text"
                                 className="input-field"
-                                placeholder="••••••••"
-                                value={senha}
-                                onChange={(e) => setSenha(e.target.value)}
-                                required
+                                placeholder="12345"
+                                value={rqeNumero}
+                                onChange={(e) => setRqeNumero(e.target.value)}
                             />
                         </div>
+                    )}
+
+                    {/* WhatsApp - Obrigatório */}
+                    <div className="input-group">
+                        <label className="input-label" htmlFor="telefone">WhatsApp *</label>
+                        <input
+                            id="telefone"
+                            type="tel"
+                            className="input-field"
+                            placeholder="(31) 99999-9999"
+                            value={telefone}
+                            onChange={(e) => setTelefone(e.target.value)}
+                            required
+                        />
+                    </div>
+
+                    {/* Email - Opcional */}
+                    <div className="input-group">
+                        <label className="input-label" htmlFor="email">Email Corporativo (opcional)</label>
+                        <input
+                            id="email"
+                            type="email"
+                            className="input-field"
+                            placeholder="seu.nome@santacasabh.com.br"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Senha - Opcional */}
+                    <div className="input-group">
+                        <label className="input-label" htmlFor="senha">Senha (opcional)</label>
+                        <input
+                            id="senha"
+                            type="password"
+                            className="input-field"
+                            placeholder="••••••••"
+                            value={senha}
+                            onChange={(e) => setSenha(e.target.value)}
+                        />
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                            Se não definir, você poderá usar login social
+                        </span>
                     </div>
 
                     <button type="submit" className="btn-login" disabled={loading}>

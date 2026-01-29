@@ -41,8 +41,8 @@ export const APPLE_REDIRECT_URI = typeof window !== 'undefined'
 //   3. Habilitar tokens de ID e Access no "Authentication"
 //   4. Adicionar permissões: openid, profile, email, User.Read
 //   5. Criar Client Secret (válido por 24 meses)
-export const MICROSOFT_CLIENT_ID = ""; // Preencher com Application (client) ID
-export const MICROSOFT_TENANT_ID = "common"; // "common" = multi-tenant, ou ID específico
+export const MICROSOFT_CLIENT_ID = "3a9e9d2c-7d9f-432a-a9fd-9d09d92c74f5"; // Application (client) ID
+export const MICROSOFT_TENANT_ID = "a4567b83-cd65-4d18-a9ca-34b28f4a7fbd"; // Directory (tenant) ID
 export const MICROSOFT_REDIRECT_URI = typeof window !== 'undefined'
   ? `${window.location.origin}/api/auth/microsoft/callback`
   : 'https://escalapro.santacasabh.com.br/api/auth/microsoft/callback';

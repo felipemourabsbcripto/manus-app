@@ -3,6 +3,100 @@ import { createContext, useState, useContext } from 'react';
 
 const AuthContext = createContext({});
 
+// ============================================
+// DEFINIÇÃO DE PERMISSÕES POR TIPO DE USUÁRIO
+// ============================================
+const PERMISSIONS = {
+    // Médico: acesso básico - apenas visualização e trocas
+    medico: {
+        canViewDashboard: true,
+        canViewEscalas: true,
+        canViewOwnProfile: true,
+        canEditOwnProfile: true,
+        canRequestTroca: true,
+        canOfferTroca: true,
+        canViewAnuncios: true,
+        canViewRelatorios: false,
+        canCreateEscala: false,
+        canEditEscala: false,
+        canDeleteEscala: false,
+        canManageFuncionarios: false,
+        canManageGestores: false,
+        canApproveTrocas: false,
+        canCreateAnuncios: false,
+        canManageWhatsApp: false,
+        canManagePagamentos: false,
+        canManageConfiguracoes: false,
+        canAccessAdmin: false,
+    },
+    // Gestor: pode criar escalas, aprovar trocas, fazer anúncios
+    gestor: {
+        canViewDashboard: true,
+        canViewEscalas: true,
+        canViewOwnProfile: true,
+        canEditOwnProfile: true,
+        canRequestTroca: true,
+        canOfferTroca: true,
+        canViewAnuncios: true,
+        canViewRelatorios: true,
+        canCreateEscala: true,
+        canEditEscala: true,
+        canDeleteEscala: true,
+        canManageFuncionarios: true,
+        canManageGestores: false,
+        canApproveTrocas: true,
+        canCreateAnuncios: true,
+        canManageWhatsApp: true,
+        canManagePagamentos: true,
+        canManageConfiguracoes: true,
+        canAccessAdmin: false,
+    },
+    // Admin: acesso total
+    admin: {
+        canViewDashboard: true,
+        canViewEscalas: true,
+        canViewOwnProfile: true,
+        canEditOwnProfile: true,
+        canRequestTroca: true,
+        canOfferTroca: true,
+        canViewAnuncios: true,
+        canViewRelatorios: true,
+        canCreateEscala: true,
+        canEditEscala: true,
+        canDeleteEscala: true,
+        canManageFuncionarios: true,
+        canManageGestores: true,
+        canApproveTrocas: true,
+        canCreateAnuncios: true,
+        canManageWhatsApp: true,
+        canManagePagamentos: true,
+        canManageConfiguracoes: true,
+        canAccessAdmin: true,
+    },
+    // Funcionário genérico: mesmas permissões de médico
+    funcionario: {
+        canViewDashboard: true,
+        canViewEscalas: true,
+        canViewOwnProfile: true,
+        canEditOwnProfile: true,
+        canRequestTroca: true,
+        canOfferTroca: true,
+        canViewAnuncios: true,
+        canViewRelatorios: false,
+        canCreateEscala: false,
+        canEditEscala: false,
+        canDeleteEscala: false,
+        canManageFuncionarios: false,
+        canManageGestores: false,
+        canApproveTrocas: false,
+        canCreateAnuncios: false,
+        canManageWhatsApp: false,
+        canManagePagamentos: false,
+        canManageConfiguracoes: false,
+        canAccessAdmin: false,
+    }
+};
+
 export const AuthProvider = ({ children }) => {
     // Inicializar estado com valores do localStorage
     const [user, setUser] = useState(() => {
@@ -109,6 +203,37 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('@ManusApp:token');
     };
 
+    // ============================================
+    // FUNÇÕES DE VERIFICAÇÃO DE PERMISSÃO
+    // ============================================
+    
+    // Obter tipo do usuário (com fallback para 'medico')
+    const getUserType = () => {
+        return user?.tipo || 'medico';
+    };
+
+    // Verificar se usuário tem uma permissão específica
+    const hasPermission = (permission) => {
+        const userType = getUserType();
+        const perms = PERMISSIONS[userType] || PERMISSIONS.medico;
+        return perms[permission] || false;
+    };
+
+    // Verificar se é admin
+    const isAdmin = () => getUserType() === 'admin';
+
+    // Verificar se é gestor ou admin
+    const isGestorOrAdmin = () => ['gestor', 'admin'].includes(getUserType());
+
+    // Verificar se é médico
+    const isMedico = () => ['medico', 'funcionario'].includes(getUserType());
+
+    // Obter todas as permissões do usuário atual
+    const getPermissions = () => {
+        const userType = getUserType();
+        return PERMISSIONS[userType] || PERMISSIONS.medico;
+    };
+
     return (
         <AuthContext.Provider value={{
             user,
@@ -117,7 +242,15 @@ export const AuthProvider = ({ children }) => {
             login,
             loginSocial,
             logout,
-            register
+            register,
+            // Novas funções de permissão
+            hasPermission,
+            isAdmin,
+            isGestorOrAdmin,
+            isMedico,
+            getUserType,
+            getPermissions,
+            PERMISSIONS
         }}>
             {children}
         </AuthContext.Provider>

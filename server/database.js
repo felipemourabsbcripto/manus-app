@@ -331,6 +331,94 @@ db.exec(`
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (mensagem_id) REFERENCES whatsapp_mensagens(id)
   );
+
+  -- ============ SISTEMA DE TROCAS DE PLANTÃO ============
+  
+  -- Solicitações de troca
+  CREATE TABLE IF NOT EXISTS trocas_plantao (
+    id TEXT PRIMARY KEY,
+    escala_id TEXT NOT NULL,
+    solicitante_id TEXT NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'oferta',
+    status TEXT DEFAULT 'aberta',
+    aceito_por_id TEXT,
+    aprovado_por_id TEXT,
+    motivo TEXT,
+    data_solicitacao TEXT DEFAULT CURRENT_TIMESTAMP,
+    data_aceite TEXT,
+    data_aprovacao TEXT,
+    observacoes TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (escala_id) REFERENCES escalas(id),
+    FOREIGN KEY (solicitante_id) REFERENCES funcionarios(id),
+    FOREIGN KEY (aceito_por_id) REFERENCES funcionarios(id),
+    FOREIGN KEY (aprovado_por_id) REFERENCES funcionarios(id)
+  );
+
+  -- Respostas/Ofertas para trocas
+  CREATE TABLE IF NOT EXISTS trocas_ofertas (
+    id TEXT PRIMARY KEY,
+    troca_id TEXT NOT NULL,
+    ofertante_id TEXT NOT NULL,
+    escala_oferecida_id TEXT,
+    mensagem TEXT,
+    status TEXT DEFAULT 'pendente',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (troca_id) REFERENCES trocas_plantao(id),
+    FOREIGN KEY (ofertante_id) REFERENCES funcionarios(id),
+    FOREIGN KEY (escala_oferecida_id) REFERENCES escalas(id)
+  );
+
+  -- ============ SISTEMA DE ANÚNCIOS ============
+  
+  -- Anúncios de plantões (gestores anunciam vagas/desfalques)
+  CREATE TABLE IF NOT EXISTS anuncios_plantao (
+    id TEXT PRIMARY KEY,
+    gestor_id TEXT NOT NULL,
+    titulo TEXT NOT NULL,
+    descricao TEXT,
+    tipo TEXT DEFAULT 'urgente',
+    data_plantao TEXT,
+    turno TEXT,
+    hora_inicio TEXT,
+    hora_fim TEXT,
+    valor_adicional REAL DEFAULT 0,
+    vagas INTEGER DEFAULT 1,
+    vagas_preenchidas INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'aberto',
+    enviar_whatsapp INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    expires_at TEXT,
+    FOREIGN KEY (gestor_id) REFERENCES funcionarios(id)
+  );
+
+  -- Candidaturas aos anúncios
+  CREATE TABLE IF NOT EXISTS anuncios_candidaturas (
+    id TEXT PRIMARY KEY,
+    anuncio_id TEXT NOT NULL,
+    funcionario_id TEXT NOT NULL,
+    mensagem TEXT,
+    status TEXT DEFAULT 'pendente',
+    aprovado_por_id TEXT,
+    data_aprovacao TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (anuncio_id) REFERENCES anuncios_plantao(id),
+    FOREIGN KEY (funcionario_id) REFERENCES funcionarios(id),
+    FOREIGN KEY (aprovado_por_id) REFERENCES funcionarios(id)
+  );
+
+  -- ============ CONFIGURAÇÕES DE REGRAS DE TROCA ============
+  
+  -- Regras configuráveis para trocas
+  CREATE TABLE IF NOT EXISTS regras_troca (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    descricao TEXT,
+    tipo TEXT NOT NULL,
+    valor TEXT NOT NULL,
+    ativo INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Inserir configurações padrão
@@ -352,6 +440,23 @@ const configPadrao = [
 
 const insertConfig = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
 configPadrao.forEach(([chave, valor]) => insertConfig.run(chave, valor));
+
+// Inserir regras de troca padrão
+const regrasExistem = db.prepare('SELECT COUNT(*) as count FROM regras_troca').get();
+if (regrasExistem.count === 0) {
+  const regrasPadrao = [
+    ['intervalo_minimo_horas', 'Intervalo mínimo entre plantões', 'intervalo', '11', 1],
+    ['max_horas_semana', 'Máximo de horas por semana', 'limite', '60', 1],
+    ['max_horas_dia', 'Máximo de horas por dia', 'limite', '12', 1],
+    ['aprovacao_automatica', 'Aprovação automática de trocas', 'aprovacao', 'false', 1],
+    ['periodo_troca_dias', 'Período máximo para solicitar troca (dias)', 'periodo', '7', 1],
+    ['notificar_gestor_troca', 'Notificar gestor sobre trocas', 'notificacao', 'true', 1],
+  ];
+  const insertRegra = db.prepare('INSERT INTO regras_troca (id, nome, descricao, tipo, valor, ativo) VALUES (?, ?, ?, ?, ?, ?)');
+  regrasPadrao.forEach(([nome, descricao, tipo, valor, ativo]) => {
+    insertRegra.run(uuidv4(), nome, descricao, tipo, valor, ativo);
+  });
+}
 
 // Inserir unidades institucionais se não existirem
 const countUnidades = db.prepare("SELECT COUNT(*) as count FROM unidades").get();

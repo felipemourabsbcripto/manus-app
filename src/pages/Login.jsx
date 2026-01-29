@@ -283,12 +283,35 @@ export default function Login() {
                         src={logo}
                         alt="Hospital Santa Casa BH"
                         className="logo-img"
+                        style={{ width: '120px', height: '120px', marginBottom: '1rem' }}
                     />
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Hospital</span>
-                    <h2 className="institution-name">Santa Casa BH</h2>
+                    <span style={{ 
+                        fontSize: '0.75rem', 
+                        color: '#64748b', 
+                        fontWeight: 500, 
+                        textTransform: 'uppercase', 
+                        letterSpacing: '0.2em',
+                        marginBottom: '0.25rem',
+                        display: 'block'
+                    }}>Hospital</span>
+                    <h2 className="institution-name" style={{
+                        fontSize: '1.75rem',
+                        fontWeight: 700,
+                        color: '#b91c1c',
+                        marginBottom: '0.5rem',
+                        letterSpacing: '0.02em'
+                    }}>Santa Casa BH</h2>
+                    <span style={{ 
+                        fontSize: '0.7rem', 
+                        color: '#64748b', 
+                        fontWeight: 600, 
+                        textTransform: 'uppercase', 
+                        letterSpacing: '0.15em',
+                        display: 'block',
+                        marginBottom: '1.5rem'
+                    }}>GESTÃO DE PLANTÕES</span>
                 </div>
 
-                <h1 className="login-title">Gestor de Escalas</h1>
                 <p className="login-subtitle">Acesse sua conta para continuar</p>
 
                 {/* Form Block */}

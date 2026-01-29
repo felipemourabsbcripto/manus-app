@@ -3,7 +3,7 @@ import {
   MessageSquare, Users, Plus, Send, Check, CheckCheck, X,
   Phone, Link2, QrCode, Wifi, WifiOff, UserPlus, Bell, RefreshCw,
   Shield, Trash2, Edit2, ArrowUp, ArrowDown, AlertTriangle, BarChart3,
-  Settings, Globe, Key, Activity
+  Settings, Globe, Key, Activity, ExternalLink, Smartphone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { API_URL } from '../config';
@@ -30,6 +30,7 @@ function WhatsApp() {
   // eslint-disable-next-line no-unused-vars
   const [showModalEstatisticas, setShowModalEstatisticas] = useState(false);
   const [showModalConfig, setShowModalConfig] = useState(false);
+  const [showWhatsAppWeb, setShowWhatsAppWeb] = useState(false);
 
   const [grupoSelecionado, setGrupoSelecionado] = useState(null);
   const [novaMensagem, setNovaMensagem] = useState({ destino: 'grupo', grupo_id: '', funcionario_id: '', mensagem: '' });
@@ -40,11 +41,16 @@ function WhatsApp() {
     key: '',
     instance: ''
   });
+  
+  // Modo simples de envio (direto via link wa.me)
+  const [modoSimples, setModoSimples] = useState(true);
+  const [numeroDestino, setNumeroDestino] = useState('');
+  const [mensagemRapida, setMensagemRapida] = useState('');
 
   const [supervisorForm, setSupervisorForm] = useState({ nome: '', whatsapp: '', email: '' });
   // eslint-disable-next-line no-unused-vars
   const [editandoSupervisor, setEditandoSupervisor] = useState(null);
-  const [abaSelecionada, setAbaSelecionada] = useState('grupos');
+  const [abaSelecionada, setAbaSelecionada] = useState('rapido');
 
   useEffect(() => {
     fetchInitialData();
@@ -198,6 +204,39 @@ function WhatsApp() {
     fetchMensagens();
   };
 
+  // Função para enviar mensagem rápida via wa.me (modo simples)
+  const enviarMensagemRapida = () => {
+    if (!numeroDestino || !mensagemRapida) {
+      alert('Preencha o número e a mensagem');
+      return;
+    }
+    // Limpar número (remover caracteres especiais)
+    const numeroLimpo = numeroDestino.replace(/\D/g, '');
+    // Adicionar código do Brasil se não tiver
+    const numeroCompleto = numeroLimpo.startsWith('55') ? numeroLimpo : `55${numeroLimpo}`;
+    // Codificar mensagem para URL
+    const mensagemCodificada = encodeURIComponent(mensagemRapida);
+    // Abrir WhatsApp Web
+    window.open(`https://wa.me/${numeroCompleto}?text=${mensagemCodificada}`, '_blank');
+  };
+
+  // Abrir WhatsApp Web diretamente
+  const abrirWhatsAppWeb = () => {
+    window.open('https://web.whatsapp.com', '_blank');
+  };
+
+  // Enviar para funcionário específico
+  const enviarParaFuncionario = (funcionario) => {
+    if (!funcionario.telefone) {
+      alert('Este funcionário não tem telefone cadastrado');
+      return;
+    }
+    const numeroLimpo = funcionario.telefone.replace(/\D/g, '');
+    const numeroCompleto = numeroLimpo.startsWith('55') ? numeroLimpo : `55${numeroLimpo}`;
+    setNumeroDestino(funcionario.telefone);
+    setMensagemRapida(`Olá ${funcionario.nome}, `);
+  };
+
   if (loading) return <div className="loading"><div className="spinner"></div></div>;
 
   return (
@@ -205,82 +244,375 @@ function WhatsApp() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Comunicação WhatsApp</h1>
-          <p className="page-subtitle">Instâncias reais e sistema de backup</p>
+          <p className="page-subtitle">Envie mensagens rapidamente para sua equipe</p>
         </div>
         <div className="flex gap-2">
+          <button 
+            className="btn btn-success" 
+            onClick={abrirWhatsAppWeb}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <ExternalLink size={18} />
+            Abrir WhatsApp Web
+          </button>
           <button className="btn btn-secondary" onClick={() => setShowModalConfig(true)}>
             <Settings size={20} />
-            Configurar API
+            API Avançada
           </button>
-          {conexao?.status === 'conectado' ? (
-            <button className="btn btn-danger" onClick={handleDesconectar}>
-              <WifiOff size={20} />
-              Desconectar
-            </button>
-          ) : (
-            <button className="btn btn-primary" onClick={handleConectar}>
-              <QrCode size={20} />
-              Conectar WhatsApp
-            </button>
-          )}
         </div>
       </div>
 
-      <div className="grid-3 mb-3">
-        <div className="card">
-          <label className="form-label">Gestor Responsável</label>
-          <select
-            className="form-select"
-            value={gestorSelecionado}
-            onChange={e => setGestorSelecionado(e.target.value)}
-          >
-            {gestores.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
-          </select>
-        </div>
-        <div className="card text-center">
-          <p className="text-secondary text-xs uppercase font-bold mb-2">Status da Instância</p>
-          <div className="flex items-center justify-center gap-2">
-            {conexao?.status === 'conectado' ? (
-              <span className="badge badge-success"><Wifi size={14} /> Conectado</span>
-            ) : (
-              <span className="badge badge-danger"><WifiOff size={14} /> Desconectado</span>
-            )}
-            {conexao?.instancia && <span className="text-xs text-secondary">[{conexao.instancia}]</span>}
-          </div>
-        </div>
-        <div className="card text-center">
-          <p className="text-secondary text-xs uppercase font-bold mb-2">Supervisores de Backup</p>
-          <div className="flex items-center justify-center gap-2">
-            <span className="badge badge-info"><Shield size={14} /> {supervisores.length} Ativos</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="tabs flex gap-2 mb-3">
+      {/* Tabs de navegação */}
+      <div className="tabs flex gap-2 mb-3" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+        <button
+          className={`btn ${abaSelecionada === 'rapido' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setAbaSelecionada('rapido')}
+        >
+          <Smartphone size={18} /> Envio Rápido
+        </button>
+        <button
+          className={`btn ${abaSelecionada === 'equipe' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setAbaSelecionada('equipe')}
+        >
+          <Users size={18} /> Enviar para Equipe
+        </button>
         <button
           className={`btn ${abaSelecionada === 'grupos' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setAbaSelecionada('grupos')}
         >
-          <Users size={18} /> Grupos e Mensagens
+          <MessageSquare size={18} /> Grupos
         </button>
         <button
           className={`btn ${abaSelecionada === 'supervisores' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setAbaSelecionada('supervisores')}
         >
-          <Shield size={18} /> Supervisores de Backup
+          <Shield size={18} /> Supervisores
         </button>
       </div>
 
-      {abaSelecionada === 'grupos' ? (
+      {/* ========== ABA: ENVIO RÁPIDO ========== */}
+      {abaSelecionada === 'rapido' && (
         <div className="grid-2">
-          {/* Coluna Grupos */}
+          <div className="card" style={{ background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)', color: 'white' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+              <div style={{ 
+                width: '50px', 
+                height: '50px', 
+                background: 'rgba(255,255,255,0.2)', 
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <MessageSquare size={28} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Envio Rápido</h2>
+                <p style={{ fontSize: '0.85rem', opacity: 0.9, margin: 0 }}>Envie mensagem sem configurações</p>
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>
+                <Phone size={14} style={{ marginRight: '6px', display: 'inline' }} />
+                Número WhatsApp
+              </label>
+              <input
+                type="tel"
+                className="form-input"
+                placeholder="(31) 99999-9999"
+                value={numeroDestino}
+                onChange={(e) => setNumeroDestino(e.target.value)}
+                style={{ 
+                  background: 'rgba(255,255,255,0.95)', 
+                  color: '#1a1a1a',
+                  border: 'none',
+                  fontSize: '1rem'
+                }}
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>
+                <MessageSquare size={14} style={{ marginRight: '6px', display: 'inline' }} />
+                Mensagem
+              </label>
+              <textarea
+                className="form-input"
+                placeholder="Digite sua mensagem aqui..."
+                value={mensagemRapida}
+                onChange={(e) => setMensagemRapida(e.target.value)}
+                rows={4}
+                style={{ 
+                  background: 'rgba(255,255,255,0.95)', 
+                  color: '#1a1a1a',
+                  border: 'none',
+                  fontSize: '1rem',
+                  resize: 'none'
+                }}
+              />
+            </div>
+
+            <button 
+              className="btn"
+              onClick={enviarMensagemRapida}
+              style={{ 
+                width: '100%', 
+                background: 'white', 
+                color: '#128C7E',
+                fontWeight: 700,
+                fontSize: '1rem',
+                padding: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <Send size={20} />
+              Enviar pelo WhatsApp
+            </button>
+          </div>
+
           <div className="card">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="card-title">Grupos</h2>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowModalGrupo(true)}>
-                <Plus size={16} /> Novo
+            <h3 className="card-title" style={{ marginBottom: '1rem' }}>
+              <Activity size={20} style={{ marginRight: '8px' }} />
+              Como funciona
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '1rem',
+                padding: '1rem',
+                background: 'var(--bg-secondary)',
+                borderRadius: '8px'
+              }}>
+                <div style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  background: 'var(--primary)', 
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 700,
+                  flexShrink: 0
+                }}>1</div>
+                <div>
+                  <strong>Digite o número</strong>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                    Coloque o número com DDD (ex: 31999999999)
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '1rem',
+                padding: '1rem',
+                background: 'var(--bg-secondary)',
+                borderRadius: '8px'
+              }}>
+                <div style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  background: 'var(--primary)', 
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 700,
+                  flexShrink: 0
+                }}>2</div>
+                <div>
+                  <strong>Escreva a mensagem</strong>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                    A mensagem será pré-preenchida no WhatsApp
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '1rem',
+                padding: '1rem',
+                background: 'var(--bg-secondary)',
+                borderRadius: '8px'
+              }}>
+                <div style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  background: '#25D366', 
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 700,
+                  flexShrink: 0
+                }}>3</div>
+                <div>
+                  <strong>Clique em Enviar</strong>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                    Abre o WhatsApp Web pronto para enviar!
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ 
+              marginTop: '1.5rem', 
+              padding: '1rem', 
+              background: 'rgba(37, 211, 102, 0.1)', 
+              borderRadius: '8px',
+              border: '1px solid rgba(37, 211, 102, 0.2)'
+            }}>
+              <p style={{ fontSize: '0.85rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Check size={16} color="#25D366" />
+                <span><strong>Sem configuração!</strong> Funciona direto pelo navegador.</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== ABA: ENVIAR PARA EQUIPE ========== */}
+      {abaSelecionada === 'equipe' && (
+        <div className="card">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="card-title">Selecione um funcionário para enviar mensagem</h2>
+            <div className="flex gap-2">
+              <select
+                className="form-select"
+                value={gestorSelecionado}
+                onChange={e => setGestorSelecionado(e.target.value)}
+                style={{ maxWidth: '200px' }}
+              >
+                <option value="">Todos os setores</option>
+                {gestores.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+              </select>
+            </div>
+          </div>
+          
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Cargo</th>
+                  <th>Telefone</th>
+                  <th style={{ width: '150px' }}>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {funcionarios.filter(f => f.ativo).map(func => (
+                  <tr key={func.id}>
+                    <td>
+                      <strong>{func.nome}</strong>
+                      {func.especialidade && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{func.especialidade}</span>}
+                    </td>
+                    <td>{func.cargo || '-'}</td>
+                    <td>
+                      {func.telefone ? (
+                        <span style={{ fontFamily: 'monospace' }}>{func.telefone}</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-secondary)' }}>Não cadastrado</span>
+                      )}
+                    </td>
+                    <td>
+                      {func.telefone ? (
+                        <button 
+                          className="btn btn-success btn-sm"
+                          onClick={() => enviarParaFuncionario(func)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Send size={14} /> Enviar
+                        </button>
+                      ) : (
+                        <span className="badge badge-secondary">Sem telefone</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {numeroDestino && (
+            <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
+              <h4 style={{ marginBottom: '0.75rem' }}>Mensagem para: {numeroDestino}</h4>
+              <textarea
+                className="form-input"
+                placeholder="Digite sua mensagem..."
+                value={mensagemRapida}
+                onChange={(e) => setMensagemRapida(e.target.value)}
+                rows={3}
+                style={{ marginBottom: '0.75rem' }}
+              />
+              <button className="btn btn-success" onClick={enviarMensagemRapida}>
+                <Send size={18} /> Enviar pelo WhatsApp
               </button>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ========== ABA: GRUPOS (original) ========== */}
+      {abaSelecionada === 'grupos' && (
+        <>
+          <div className="grid-3 mb-3">
+            <div className="card">
+              <label className="form-label">Gestor Responsável</label>
+              <select
+                className="form-select"
+                value={gestorSelecionado}
+                onChange={e => setGestorSelecionado(e.target.value)}
+              >
+                {gestores.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+              </select>
+            </div>
+            <div className="card text-center">
+              <p className="text-secondary text-xs uppercase font-bold mb-2">Status da Instância</p>
+              <div className="flex items-center justify-center gap-2">
+                {conexao?.status === 'conectado' ? (
+                  <span className="badge badge-success"><Wifi size={14} /> Conectado</span>
+                ) : (
+                  <span className="badge badge-danger"><WifiOff size={14} /> Desconectado</span>
+                )}
+                {conexao?.instancia && <span className="text-xs text-secondary">[{conexao.instancia}]</span>}
+              </div>
+            </div>
+            <div className="card text-center">
+              <p className="text-secondary text-xs uppercase font-bold mb-2">Ações Rápidas</p>
+              <div className="flex gap-2 justify-center">
+                {conexao?.status === 'conectado' ? (
+                  <button className="btn btn-danger btn-sm" onClick={handleDesconectar}>
+                    <WifiOff size={16} /> Desconectar
+                  </button>
+                ) : (
+                  <button className="btn btn-primary btn-sm" onClick={handleConectar}>
+                    <QrCode size={16} /> Conectar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            {/* Coluna Grupos */}
+            <div className="card">
+              <div className="flex justify-between items-center mb-3">
+                <h2 className="card-title">Grupos</h2>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowModalGrupo(true)}>
+                  <Plus size={16} /> Novo
+                </button>
+              </div>
             <div className="list">
               {grupos.map(g => (
                 <div
@@ -339,7 +671,11 @@ function WhatsApp() {
             ) : <p className="text-center text-secondary py-5">Selecione um grupo para gerenciar</p>}
           </div>
         </div>
-      ) : (
+        </>
+      )}
+
+      {/* ========== ABA: SUPERVISORES ========== */}
+      {abaSelecionada === 'supervisores' && (
         <div className="card">
           <div className="flex justify-between items-center mb-3">
             <h2 className="card-title">Supervisores Cadastrados</h2>

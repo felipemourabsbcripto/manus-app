@@ -144,3 +144,48 @@
 .text-2xl {
   font-size: 1.5rem;
 }
+
+/* Trocas page specific styles */
+.trocas-page .grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 1024px) {
+  .trocas-page .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .trocas-page .grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.trocas-page .grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .trocas-page .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.trocas-page .tabs {
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.trocas-page .tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.mb-4 {
+  margin-bottom: 2rem;
+}

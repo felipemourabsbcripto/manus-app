@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Calendar, Plus, Clock, ChevronLeft, ChevronRight, MapPin,
-  MoreVertical, Search, Filter, User, X
+  MoreVertical, Search, Filter, User, X, Download, Share2, CalendarPlus
 } from 'lucide-react';
 import {
   format, addDays, startOfWeek, endOfWeek, addWeeks, subWeeks,
@@ -20,6 +20,9 @@ function Escalas() {
   const [dataAtual, setDataAtual] = useState(new Date());
   const [visualizacao, setVisualizacao] = useState('mes'); // 'mes', 'semana', 'dia'
   const [showModal, setShowModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [calendarInfo, setCalendarInfo] = useState(null);
+  const [selectedFuncionarioCalendar, setSelectedFuncionarioCalendar] = useState('');
 
   // Estados para Modal de Criação (simplificado para o exemplo)
   const [form, setForm] = useState({
@@ -145,6 +148,31 @@ function Escalas() {
         hora_inicio: turno.hora_inicio,
         hora_fim: turno.hora_fim
       });
+    }
+  };
+
+  // Funções de Sincronização de Calendário
+  const abrirModalCalendario = async (funcionarioId) => {
+    try {
+      const res = await fetch(`${API_URL}/calendario/subscribe/${funcionarioId}`);
+      const data = await res.json();
+      setCalendarInfo(data);
+      setShowCalendarModal(true);
+    } catch (error) {
+      console.error('Erro ao obter info do calendário:', error);
+    }
+  };
+
+  const downloadICS = (funcionarioId) => {
+    window.open(`${API_URL}/calendario/ics/${funcionarioId}`, '_blank');
+  };
+
+  const copiarParaClipboard = async (texto) => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      alert('URL copiada para a área de transferência!');
+    } catch (error) {
+      console.error('Erro ao copiar:', error);
     }
   };
 
@@ -320,6 +348,41 @@ function Escalas() {
         </div>
 
         <div className="flex gap-3">
+          {/* Sincronização de Calendário */}
+          <div className="flex gap-2">
+            <select
+              className="form-select"
+              style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem', minWidth: '180px' }}
+              value={selectedFuncionarioCalendar}
+              onChange={e => setSelectedFuncionarioCalendar(e.target.value)}
+            >
+              <option value="">📅 Sincronizar calendário...</option>
+              {funcionarios.map(f => (
+                <option key={f.id} value={f.id}>{f.nome}</option>
+              ))}
+            </select>
+            {selectedFuncionarioCalendar && (
+              <>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                  onClick={() => downloadICS(selectedFuncionarioCalendar)}
+                  title="Baixar arquivo .ics"
+                >
+                  <Download size={16} />
+                </button>
+                <button
+                  className="btn btn-primary"
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                  onClick={() => abrirModalCalendario(selectedFuncionarioCalendar)}
+                  title="Sincronizar com Google/Outlook/Apple"
+                >
+                  <CalendarPlus size={16} />
+                </button>
+              </>
+            )}
+          </div>
+
           {/* View Switcher */}
           <div className="view-switcher">
             <button
@@ -447,6 +510,156 @@ function Escalas() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Sincronização de Calendário */}
+      {showCalendarModal && calendarInfo && (
+        <div className="modal-overlay" onClick={() => setShowCalendarModal(false)} style={{ zIndex: 2000 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                <CalendarPlus size={24} />
+                Sincronizar Calendário
+              </h2>
+              <button className="modal-close" onClick={() => setShowCalendarModal(false)}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="alert alert-info mb-3">
+              <Calendar size={20} />
+              <div>
+                <p className="font-semibold">Escalas de {calendarInfo.funcionario}</p>
+                <p className="text-sm">
+                  Sincronize automaticamente as escalas com seu calendário favorito.
+                </p>
+              </div>
+            </div>
+
+            {/* Google Calendar */}
+            <div className="card mb-3" style={{ padding: '1rem' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#4285f4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ color: 'white', fontSize: '1rem' }}>G</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold">Google Calendar</p>
+                    <p className="text-xs text-secondary">Sincronização automática</p>
+                  </div>
+                </div>
+                <a
+                  href={calendarInfo.instrucoes.google.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                >
+                  Adicionar ao Google
+                </a>
+              </div>
+            </div>
+
+            {/* Outlook */}
+            <div className="card mb-3" style={{ padding: '1rem' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#0078d4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ color: 'white', fontSize: '1rem' }}>O</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold">Outlook / Microsoft 365</p>
+                    <p className="text-xs text-secondary">Sincronização automática</p>
+                  </div>
+                </div>
+                <a
+                  href={calendarInfo.instrucoes.outlook.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', backgroundColor: '#0078d4' }}
+                >
+                  Adicionar ao Outlook
+                </a>
+              </div>
+            </div>
+
+            {/* Apple Calendar */}
+            <div className="card mb-3" style={{ padding: '1rem' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ color: 'white', fontSize: '1.2rem' }}>🍎</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold">Apple Calendar</p>
+                    <p className="text-xs text-secondary">iPhone, iPad, Mac</p>
+                  </div>
+                </div>
+                <a
+                  href={calendarInfo.instrucoes.apple.url}
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', backgroundColor: '#333' }}
+                >
+                  Adicionar ao Apple
+                </a>
+              </div>
+            </div>
+
+            {/* Download direto */}
+            <div className="card mb-3" style={{ padding: '1rem' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Download size={18} color="white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Baixar Arquivo .ICS</p>
+                    <p className="text-xs text-secondary">Importe manualmente em qualquer app</p>
+                  </div>
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                  onClick={() => downloadICS(selectedFuncionarioCalendar)}
+                >
+                  <Download size={16} />
+                  Baixar
+                </button>
+              </div>
+            </div>
+
+            {/* URL para copiar */}
+            <div className="form-group">
+              <label className="form-label">URL de Assinatura (webcal)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="form-input"
+                  value={calendarInfo.url_subscribe}
+                  readOnly
+                  style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}
+                />
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => copiarParaClipboard(calendarInfo.url_subscribe)}
+                  title="Copiar URL"
+                >
+                  <Share2 size={16} />
+                </button>
+              </div>
+              <p className="text-xs text-secondary mt-1">
+                Cole esta URL no seu aplicativo de calendário para sincronização automática.
+              </p>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowCalendarModal(false)}>
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

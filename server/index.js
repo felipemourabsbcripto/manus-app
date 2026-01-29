@@ -170,12 +170,16 @@ app.get('/api/auth/microsoft/callback', async (req, res) => {
   }
 
   try {
-    // Trocar code por tokens
-    const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || '';
-    const MICROSOFT_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || '';
+    // Configurações Microsoft Azure AD
+    const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || '3a9e9d2c-7d9f-432a-a9fd-9d09d92c74f5';
+    const MICROSOFT_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || ''; // Criar no Azure Portal
+    const MICROSOFT_TENANT_ID = process.env.MICROSOFT_TENANT_ID || 'a4567b83-cd65-4d18-a9ca-34b28f4a7fbd';
     const MICROSOFT_REDIRECT_URI = process.env.MICROSOFT_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/microsoft/callback`;
 
-    const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+    // URL de token usando o tenant específico
+    const tokenUrl = `https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/oauth2/v2.0/token`;
+
+    const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -183,21 +187,29 @@ app.get('/api/auth/microsoft/callback', async (req, res) => {
         client_secret: MICROSOFT_CLIENT_SECRET,
         code: code,
         redirect_uri: MICROSOFT_REDIRECT_URI,
-        grant_type: 'authorization_code'
+        grant_type: 'authorization_code',
+        scope: 'openid profile email User.Read'
       })
     });
 
     const tokens = await tokenResponse.json();
 
     if (tokens.error) {
-      console.error('❌ Microsoft Token Error:', tokens.error_description);
-      return res.redirect(`/?error=${encodeURIComponent(tokens.error_description)}`);
+      console.error('❌ Microsoft Token Error:', tokens.error, tokens.error_description);
+      // Se não tiver client_secret, tentar método alternativo (apenas para SPA/Mobile)
+      if (tokens.error === 'invalid_client') {
+        console.log('⚠️ Client Secret não configurado. Configure MICROSOFT_CLIENT_SECRET nas variáveis de ambiente.');
+        return res.redirect('/?error=Configuração do login Microsoft incompleta. Entre em contato com o suporte.');
+      }
+      return res.redirect(`/?error=${encodeURIComponent(tokens.error_description || tokens.error)}`);
     }
 
     // Decodificar ID token para pegar dados do usuário
     const payload = JSON.parse(atob(tokens.id_token.split('.')[1]));
-    const email = payload.preferred_username || payload.email;
+    const email = payload.preferred_username || payload.email || payload.upn;
     const nome = payload.name;
+    
+    console.log('✅ Microsoft Auth verificado:', email, '| Nome:', nome);
 
     // Verificar/criar usuário
     let usuario = db.prepare('SELECT * FROM funcionarios WHERE email = ?').get(email);
@@ -209,13 +221,14 @@ app.get('/api/auth/microsoft/callback', async (req, res) => {
         VALUES (?, ?, ?, 'gestor', 'Gestor (Microsoft)', 1)
       `).run(id, nome || email.split('@')[0], email);
       usuario = db.prepare('SELECT * FROM funcionarios WHERE id = ?').get(id);
+      console.log('📝 Novo usuário criado via Microsoft:', email);
     }
 
     // Redirecionar com dados para o frontend processar
     const authData = encodeURIComponent(JSON.stringify({
       success: true,
       provider: 'microsoft',
-      user: { id: usuario.id, nome: usuario.nome, email: usuario.email },
+      user: { id: usuario.id, nome: usuario.nome, email: usuario.email, tipo: usuario.tipo },
       token: `microsoft-token-${uuidv4()}`
     }));
 
@@ -619,6 +632,205 @@ app.delete('/api/escalas/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ============ CALENDÁRIO - EXPORTAÇÃO (.ICS) ============
+
+// Gerar arquivo .ics (iCalendar) para um funcionário
+app.get('/api/calendario/ics/:funcionario_id', (req, res) => {
+  try {
+    const { funcionario_id } = req.params;
+    const { data_inicio, data_fim } = req.query;
+    
+    const funcionario = db.prepare('SELECT * FROM funcionarios WHERE id = ?').get(funcionario_id);
+    if (!funcionario) {
+      return res.status(404).json({ error: 'Funcionário não encontrado' });
+    }
+    
+    // Buscar escalas do período (ou próximos 90 dias)
+    const inicio = data_inicio || new Date().toISOString().split('T')[0];
+    const fim = data_fim || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const escalas = db.prepare(`
+      SELECT e.*, t.nome as turno_nome, h.nome as hospital_nome, h.endereco as hospital_endereco
+      FROM escalas e
+      LEFT JOIN turnos t ON e.turno_id = t.id
+      LEFT JOIN hospitais h ON t.hospital_id = h.id
+      WHERE e.funcionario_id = ? AND e.data BETWEEN ? AND ?
+      ORDER BY e.data, e.hora_inicio
+    `).all(funcionario_id, inicio, fim);
+    
+    // Gerar conteúdo .ics
+    let ics = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//EscalaPro//NONSGML v1.0//PT
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Escalas - ${funcionario.nome}
+X-WR-TIMEZONE:America/Sao_Paulo
+`;
+    
+    escalas.forEach(escala => {
+      const dtStart = escala.data.replace(/-/g, '') + 'T' + escala.hora_inicio.replace(/:/g, '') + '00';
+      const dtEnd = escala.data.replace(/-/g, '') + 'T' + escala.hora_fim.replace(/:/g, '') + '00';
+      const uid = `${escala.id}@escalapro.com.br`;
+      const now = format(new Date(), "yyyyMMdd'T'HHmmss");
+      
+      ics += `BEGIN:VEVENT
+UID:${uid}
+DTSTAMP:${now}Z
+DTSTART;TZID=America/Sao_Paulo:${dtStart}
+DTEND;TZID=America/Sao_Paulo:${dtEnd}
+SUMMARY:🏥 Plantão - ${escala.turno_nome || 'Plantão'}
+DESCRIPTION:Escala de trabalho no ${escala.hospital_nome || 'Hospital'}
+LOCATION:${escala.hospital_endereco || escala.hospital_nome || ''}
+STATUS:CONFIRMED
+CATEGORIES:Plantão,Trabalho
+BEGIN:VALARM
+TRIGGER:-PT60M
+ACTION:DISPLAY
+DESCRIPTION:Lembrete: Plantão em 1 hora
+END:VALARM
+END:VEVENT
+`;
+    });
+    
+    ics += 'END:VCALENDAR';
+    
+    // Enviar arquivo
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="escalas-${funcionario.nome.replace(/\s+/g, '-').toLowerCase()}.ics"`);
+    res.send(ics);
+  } catch (error) {
+    console.error('Erro ao gerar ICS:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// URL de inscrição de calendário (para sincronização automática)
+app.get('/api/calendario/subscribe/:funcionario_id', (req, res) => {
+  try {
+    const { funcionario_id } = req.params;
+    
+    const funcionario = db.prepare('SELECT * FROM funcionarios WHERE id = ?').get(funcionario_id);
+    if (!funcionario) {
+      return res.status(404).json({ error: 'Funcionário não encontrado' });
+    }
+    
+    // Gerar URL de inscrição
+    const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+    const subscribeUrl = `${baseUrl}/api/calendario/ics/${funcionario_id}`;
+    
+    // URLs específicas para cada plataforma
+    const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(subscribeUrl)}`;
+    const outlookUrl = `https://outlook.live.com/calendar/0/addcalendar?name=Escalas%20EscalaPro&url=${encodeURIComponent(subscribeUrl)}`;
+    
+    res.json({
+      funcionario: funcionario.nome,
+      url_download: subscribeUrl,
+      url_subscribe: subscribeUrl.replace('http://', 'webcal://').replace('https://', 'webcal://'),
+      instrucoes: {
+        google: {
+          url: googleCalendarUrl,
+          passos: [
+            '1. Clique no link ou copie a URL',
+            '2. No Google Calendar, vá em "Configurações" > "Adicionar calendário"',
+            '3. Selecione "De URL" e cole a URL de inscrição'
+          ]
+        },
+        outlook: {
+          url: outlookUrl,
+          passos: [
+            '1. Clique no link ou copie a URL',
+            '2. No Outlook, vá em "Adicionar calendário" > "Assinar da web"',
+            '3. Cole a URL de inscrição'
+          ]
+        },
+        apple: {
+          url: subscribeUrl.replace('http://', 'webcal://').replace('https://', 'webcal://'),
+          passos: [
+            '1. Abra o aplicativo Calendário no iPhone/Mac',
+            '2. Vá em "Arquivo" > "Nova Assinatura de Calendário"',
+            '3. Cole a URL de inscrição'
+          ]
+        },
+        download: {
+          url: subscribeUrl,
+          passos: [
+            '1. Clique para baixar o arquivo .ics',
+            '2. Abra com seu aplicativo de calendário preferido'
+          ]
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao gerar URL de inscrição:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Gerar arquivo .ics de todas escalas de um gestor/setor
+app.get('/api/calendario/ics-equipe/:gestor_id', (req, res) => {
+  try {
+    const { gestor_id } = req.params;
+    const { data_inicio, data_fim } = req.query;
+    
+    const gestor = db.prepare('SELECT * FROM gestores WHERE id = ?').get(gestor_id);
+    if (!gestor) {
+      return res.status(404).json({ error: 'Gestor não encontrado' });
+    }
+    
+    const inicio = data_inicio || new Date().toISOString().split('T')[0];
+    const fim = data_fim || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const escalas = db.prepare(`
+      SELECT e.*, f.nome as funcionario_nome, t.nome as turno_nome, h.nome as hospital_nome
+      FROM escalas e
+      JOIN funcionarios f ON e.funcionario_id = f.id
+      LEFT JOIN turnos t ON e.turno_id = t.id
+      LEFT JOIN hospitais h ON t.hospital_id = h.id
+      WHERE f.gestor_id = ? AND e.data BETWEEN ? AND ?
+      ORDER BY e.data, e.hora_inicio
+    `).all(gestor_id, inicio, fim);
+    
+    let ics = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//EscalaPro//NONSGML v1.0//PT
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Escalas Equipe - ${gestor.setor}
+X-WR-TIMEZONE:America/Sao_Paulo
+`;
+    
+    escalas.forEach(escala => {
+      const dtStart = escala.data.replace(/-/g, '') + 'T' + escala.hora_inicio.replace(/:/g, '') + '00';
+      const dtEnd = escala.data.replace(/-/g, '') + 'T' + escala.hora_fim.replace(/:/g, '') + '00';
+      const uid = `${escala.id}@escalapro.com.br`;
+      const now = format(new Date(), "yyyyMMdd'T'HHmmss");
+      
+      ics += `BEGIN:VEVENT
+UID:${uid}
+DTSTAMP:${now}Z
+DTSTART;TZID=America/Sao_Paulo:${dtStart}
+DTEND;TZID=America/Sao_Paulo:${dtEnd}
+SUMMARY:${escala.funcionario_nome} - ${escala.turno_nome || 'Plantão'}
+DESCRIPTION:Plantão de ${escala.funcionario_nome}
+LOCATION:${escala.hospital_nome || ''}
+STATUS:CONFIRMED
+CATEGORIES:Equipe,Plantão
+END:VEVENT
+`;
+    });
+    
+    ics += 'END:VCALENDAR';
+    
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="escalas-equipe-${gestor.setor.replace(/\s+/g, '-').toLowerCase()}.ics"`);
+    res.send(ics);
+  } catch (error) {
+    console.error('Erro ao gerar ICS equipe:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============ PRESENÇAS / FUROS ============
 app.get('/api/presencas', (req, res) => {
   const { data_inicio, data_fim, status, funcionario_id, gestor_id } = req.query;
@@ -838,12 +1050,162 @@ app.post('/api/presencas/verificar-furos', async (req, res) => {
 
 // ============ GEOLOCALIZAÇÃO / CHECK-IN / CHECK-OUT ============
 
-// Check-in com localização
+// Check-in com localização (GPS)
 app.post('/api/checkin', async (req, res) => {
   try {
     const { funcionario_id, latitude, longitude } = req.body;
     const resultado = await localizacao.fazerCheckIn(funcionario_id, latitude, longitude);
     res.json(resultado);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check-in via QR Code
+app.post('/api/checkin/qrcode', async (req, res) => {
+  try {
+    const { funcionario_id, codigo_qr } = req.body;
+    
+    // Validar código QR (formato: ESCALAPRO-{hospital_id}-{timestamp}-{hash})
+    if (!codigo_qr || !codigo_qr.startsWith('ESCALAPRO-')) {
+      return res.status(400).json({ error: 'Código QR inválido' });
+    }
+    
+    const partes = codigo_qr.split('-');
+    if (partes.length < 4) {
+      return res.status(400).json({ error: 'Formato de código inválido' });
+    }
+    
+    const hospital_id = partes[1];
+    const timestamp = parseInt(partes[2]);
+    
+    // Verificar se o código não expirou (válido por 5 minutos)
+    const agora = Date.now();
+    const cincoMinutos = 5 * 60 * 1000;
+    if (agora - timestamp > cincoMinutos) {
+      return res.status(400).json({ error: 'Código QR expirado. Gere um novo código.' });
+    }
+    
+    // Buscar hospital
+    const hospital = db.prepare('SELECT * FROM hospitais WHERE id = ?').get(hospital_id);
+    if (!hospital) {
+      return res.status(400).json({ error: 'Hospital não encontrado' });
+    }
+    
+    // Fazer check-in usando coordenadas do hospital
+    const resultado = await localizacao.fazerCheckIn(
+      funcionario_id, 
+      hospital.latitude, 
+      hospital.longitude,
+      'qrcode' // tipo de check-in
+    );
+    
+    res.json({ 
+      ...resultado, 
+      metodo: 'qrcode',
+      hospital: hospital.nome 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Gerar QR Code para check-in (gestor/admin)
+app.post('/api/checkin/gerar-qrcode', (req, res) => {
+  try {
+    const { hospital_id } = req.body;
+    
+    const hospital = db.prepare('SELECT * FROM hospitais WHERE id = ?').get(hospital_id);
+    if (!hospital) {
+      return res.status(404).json({ error: 'Hospital não encontrado' });
+    }
+    
+    // Gerar código único
+    const timestamp = Date.now();
+    const hash = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const codigo = `ESCALAPRO-${hospital_id}-${timestamp}-${hash}`;
+    
+    // Validade do QR Code (5 minutos)
+    const expira_em = new Date(timestamp + 5 * 60 * 1000).toISOString();
+    
+    res.json({
+      codigo,
+      hospital: hospital.nome,
+      expira_em,
+      valido_por_minutos: 5
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check-in via código manual
+app.post('/api/checkin/codigo-manual', async (req, res) => {
+  try {
+    const { funcionario_id, codigo } = req.body;
+    
+    // Código diário do hospital (formato simples: HOSP-DDMM)
+    const hoje = new Date();
+    const diaAtual = String(hoje.getDate()).padStart(2, '0');
+    const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0');
+    
+    // Buscar hospital pelo código
+    const hospitais = db.prepare('SELECT * FROM hospitais WHERE ativo = 1').all();
+    let hospitalEncontrado = null;
+    
+    for (const hospital of hospitais) {
+      // Código esperado: primeiras 4 letras do nome + DDMM
+      const prefixo = hospital.nome.replace(/[^A-Za-z]/g, '').substring(0, 4).toUpperCase();
+      const codigoEsperado = `${prefixo}${diaAtual}${mesAtual}`;
+      
+      if (codigo.toUpperCase() === codigoEsperado) {
+        hospitalEncontrado = hospital;
+        break;
+      }
+    }
+    
+    if (!hospitalEncontrado) {
+      return res.status(400).json({ error: 'Código inválido ou expirado' });
+    }
+    
+    // Fazer check-in
+    const resultado = await localizacao.fazerCheckIn(
+      funcionario_id, 
+      hospitalEncontrado.latitude, 
+      hospitalEncontrado.longitude,
+      'codigo'
+    );
+    
+    res.json({ 
+      ...resultado, 
+      metodo: 'codigo',
+      hospital: hospitalEncontrado.nome 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Obter código diário do hospital
+app.get('/api/hospitais/:id/codigo-diario', (req, res) => {
+  try {
+    const hospital = db.prepare('SELECT * FROM hospitais WHERE id = ?').get(req.params.id);
+    if (!hospital) {
+      return res.status(404).json({ error: 'Hospital não encontrado' });
+    }
+    
+    const hoje = new Date();
+    const diaAtual = String(hoje.getDate()).padStart(2, '0');
+    const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0');
+    const prefixo = hospital.nome.replace(/[^A-Za-z]/g, '').substring(0, 4).toUpperCase();
+    const codigo = `${prefixo}${diaAtual}${mesAtual}`;
+    
+    res.json({
+      codigo,
+      hospital: hospital.nome,
+      data: format(hoje, 'dd/MM/yyyy'),
+      valido_ate: '23:59'
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -888,52 +1250,58 @@ app.post('/api/localizacao/executar-verificacoes', async (req, res) => {
   }
 });
 
-// ============ WHATSAPP ============
+// ============ WHATSAPP (SIMPLIFICADO) ============
 
-// Gerar QR Code para conexão
-app.post('/api/whatsapp/conectar', async (req, res) => {
+// Gerar link de mensagem WhatsApp
+app.post('/api/whatsapp/gerar-link', (req, res) => {
   try {
-    const { gestor_id, api_config } = req.body;
-    const resultado = await whatsapp.gerarQRCode(gestor_id, api_config);
+    const { numero, mensagem } = req.body;
+    const link = whatsapp.gerarLinkWhatsApp(numero, mensagem);
+    res.json({ success: true, link });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Enviar mensagem (retorna link ou envia via API se configurada)
+app.post('/api/whatsapp/enviar', async (req, res) => {
+  try {
+    const { gestor_id, numero, mensagem, template, dados } = req.body;
+    
+    let mensagemFinal = mensagem;
+    if (template && dados) {
+      mensagemFinal = whatsapp.gerarMensagem(template, dados);
+    }
+    
+    const resultado = await whatsapp.enviar(gestor_id, numero, mensagemFinal);
     res.json(resultado);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Confirmar conexão (simulação)
-app.post('/api/whatsapp/confirmar-conexao', async (req, res) => {
+// Enviar para múltiplos destinatários
+app.post('/api/whatsapp/enviar-lote', async (req, res) => {
   try {
-    const { gestor_id, telefone } = req.body;
-    const resultado = await whatsapp.confirmarConexao(gestor_id, telefone);
-    res.json(resultado);
+    const { gestor_id, destinatarios, mensagem } = req.body;
+    const resultados = await whatsapp.enviarLote(gestor_id, destinatarios, mensagem);
+    res.json({ success: true, resultados });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Status da conexão
-app.get('/api/whatsapp/status/:gestor_id', async (req, res) => {
-  const status = await whatsapp.getStatusConexao(req.params.gestor_id);
-  res.json(status || { status: 'nao_configurado' });
+// Status da conexão (sempre ativo no modo link)
+app.get('/api/whatsapp/status/:gestor_id', (req, res) => {
+  const status = whatsapp.getStatus(req.params.gestor_id);
+  res.json(status);
 });
 
-// Desconectar
-app.post('/api/whatsapp/desconectar', async (req, res) => {
+// Criar grupo (registro local)
+app.post('/api/whatsapp/grupos', (req, res) => {
   try {
-    const { gestor_id } = req.body;
-    const resultado = await whatsapp.desconectar(gestor_id);
-    res.json(resultado);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Criar grupo
-app.post('/api/whatsapp/grupos', async (req, res) => {
-  try {
-    const { gestor_id, nome } = req.body;
-    const resultado = await whatsapp.criarGrupo(gestor_id, nome);
+    const { gestor_id, nome, descricao } = req.body;
+    const resultado = whatsapp.criarGrupo(gestor_id, nome, descricao);
     res.json(resultado);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -941,34 +1309,35 @@ app.post('/api/whatsapp/grupos', async (req, res) => {
 });
 
 // Listar grupos do gestor
-app.get('/api/whatsapp/grupos/:gestor_id', async (req, res) => {
-  const grupos = await whatsapp.getGruposGestor(req.params.gestor_id);
+app.get('/api/whatsapp/grupos/:gestor_id', (req, res) => {
+  const grupos = whatsapp.getGrupos(req.params.gestor_id);
   res.json(grupos);
 });
 
 // Membros do grupo
-app.get('/api/whatsapp/grupos/:grupo_id/membros', async (req, res) => {
-  const membros = await whatsapp.getMembrosGrupo(req.params.grupo_id);
+app.get('/api/whatsapp/grupos/:grupo_id/membros', (req, res) => {
+  const membros = whatsapp.getMembrosGrupo(req.params.grupo_id);
   res.json(membros);
 });
 
 // Adicionar membro ao grupo
-app.post('/api/whatsapp/grupos/:grupo_id/membros', async (req, res) => {
+app.post('/api/whatsapp/grupos/:grupo_id/membros', (req, res) => {
   try {
     const { funcionario_id } = req.body;
-    const resultado = await whatsapp.adicionarMembro(req.params.grupo_id, funcionario_id);
+    const resultado = whatsapp.adicionarMembro(req.params.grupo_id, funcionario_id);
     res.json(resultado);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Enviar mensagem para grupo
+// Enviar para grupo (gera links para todos os membros)
 app.post('/api/whatsapp/mensagem/grupo', async (req, res) => {
   try {
-    const { grupo_id, mensagem, funcionario_marcado } = req.body;
-    const resultado = await whatsapp.enviarMensagemGrupo(grupo_id, mensagem, funcionario_marcado);
-    res.json(resultado);
+    const { grupo_id, mensagem } = req.body;
+    const grupo = db.prepare('SELECT gestor_id FROM whatsapp_grupos WHERE id = ?').get(grupo_id);
+    const resultados = await whatsapp.enviarParaGrupo(grupo?.gestor_id, grupo_id, mensagem);
+    res.json({ success: true, resultados });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -977,23 +1346,22 @@ app.post('/api/whatsapp/mensagem/grupo', async (req, res) => {
 // Enviar mensagem pessoal
 app.post('/api/whatsapp/mensagem/pessoal', async (req, res) => {
   try {
-    const { funcionario_id, mensagem } = req.body;
-    const resultado = await whatsapp.enviarMensagemPessoal(funcionario_id, mensagem);
+    const { funcionario_id, mensagem, gestor_id } = req.body;
+    const funcionario = db.prepare('SELECT * FROM funcionarios WHERE id = ?').get(funcionario_id);
+    if (!funcionario?.whatsapp && !funcionario?.telefone) {
+      return res.status(400).json({ error: 'Funcionário sem telefone cadastrado' });
+    }
+    const numero = funcionario.whatsapp || funcionario.telefone;
+    const resultado = await whatsapp.enviar(gestor_id, numero, mensagem);
     res.json(resultado);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Notificar início do plantão
-app.post('/api/whatsapp/notificar-plantao', async (req, res) => {
-  try {
-    const { gestor_id, data } = req.body;
-    const resultado = await whatsapp.notificarInicioPlantao(gestor_id, data);
-    res.json(resultado);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// Templates disponíveis
+app.get('/api/whatsapp/templates', (req, res) => {
+  res.json(Object.keys(whatsapp.templates));
 });
 
 // Histórico de mensagens
@@ -1017,12 +1385,18 @@ app.get('/api/whatsapp/mensagens', (req, res) => {
   res.json(mensagens);
 });
 
+// Estatísticas
+app.get('/api/whatsapp/estatisticas/:gestor_id', (req, res) => {
+  const estatisticas = whatsapp.getEstatisticas(req.params.gestor_id);
+  res.json(estatisticas);
+});
+
 // ============ SUPERVISORES DE BACKUP ============
 
 // Listar supervisores de um gestor
-app.get('/api/supervisores/:gestor_id', async (req, res) => {
+app.get('/api/supervisores/:gestor_id', (req, res) => {
   try {
-    const supervisores = await whatsapp.getSupervisores(req.params.gestor_id);
+    const supervisores = db.prepare('SELECT * FROM supervisores WHERE gestor_id = ? AND ativo = 1 ORDER BY ordem_prioridade ASC').all(req.params.gestor_id);
     res.json(supervisores);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1030,11 +1404,23 @@ app.get('/api/supervisores/:gestor_id', async (req, res) => {
 });
 
 // Adicionar supervisor
-app.post('/api/supervisores', async (req, res) => {
+app.post('/api/supervisores', (req, res) => {
   try {
     const { gestor_id, nome, whatsapp: whatsappNum, email, ordem_prioridade } = req.body;
-    const resultado = await whatsapp.adicionarSupervisor(gestor_id, { nome, whatsapp: whatsappNum, email, ordem_prioridade });
-    res.json(resultado);
+    const id = uuidv4();
+    const maxOrdem = db.prepare('SELECT MAX(ordem_prioridade) as max FROM supervisores WHERE gestor_id = ?').get(gestor_id);
+    const ordem = ordem_prioridade || (maxOrdem?.max || 0) + 1;
+    
+    db.prepare(`
+      INSERT INTO supervisores (id, gestor_id, nome, whatsapp, email, ordem_prioridade)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, gestor_id, nome, whatsappNum, email, ordem);
+    
+    res.json({ id, success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -1467,6 +1853,240 @@ setInterval(async () => {
 app.get('/api/unidades', (req, res) => {
   const unidades = db.prepare('SELECT * FROM unidades WHERE ativo = 1 ORDER BY nome').all();
   res.json(unidades);
+});
+
+// ============ TROCAS DE PLANTÃO ============
+
+// Listar trocas
+app.get('/api/trocas', (req, res) => {
+  try {
+    const trocas = db.prepare(`
+      SELECT 
+        t.*,
+        f1.nome as solicitante_nome,
+        f2.nome as aceito_por_nome,
+        f3.nome as aprovador_nome,
+        e.data as data_escala,
+        e.hora_inicio,
+        e.hora_fim
+      FROM trocas_plantao t
+      LEFT JOIN funcionarios f1 ON t.solicitante_id = f1.id
+      LEFT JOIN funcionarios f2 ON t.aceito_por_id = f2.id
+      LEFT JOIN funcionarios f3 ON t.aprovador_id = f3.id
+      LEFT JOIN escalas e ON t.escala_id = e.id
+      ORDER BY t.created_at DESC
+    `).all();
+    res.json(trocas);
+  } catch (error) {
+    console.error('Erro ao buscar trocas:', error);
+    res.status(500).json({ error: 'Erro ao buscar trocas' });
+  }
+});
+
+// Criar troca
+app.post('/api/trocas', (req, res) => {
+  const { escala_id, solicitante_id, tipo, motivo } = req.body;
+  
+  if (!escala_id || !solicitante_id) {
+    return res.status(400).json({ error: 'Escala e solicitante são obrigatórios' });
+  }
+  
+  const id = uuidv4();
+  try {
+    db.prepare(`
+      INSERT INTO trocas_plantao (id, escala_id, solicitante_id, tipo, motivo, status)
+      VALUES (?, ?, ?, ?, ?, 'aberta')
+    `).run(id, escala_id, solicitante_id, tipo || 'oferta', motivo || '');
+    
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error('Erro ao criar troca:', error);
+    res.status(500).json({ error: 'Erro ao criar troca' });
+  }
+});
+
+// Aceitar troca
+app.post('/api/trocas/:id/aceitar', (req, res) => {
+  const { id } = req.params;
+  const { funcionario_id } = req.body;
+  
+  try {
+    // Verificar regras de troca
+    const regras = db.prepare('SELECT * FROM regras_troca').get();
+    
+    db.prepare(`
+      UPDATE trocas_plantao 
+      SET aceito_por_id = ?, status = 'aceita', aceito_em = CURRENT_TIMESTAMP
+      WHERE id = ? AND status = 'aberta'
+    `).run(funcionario_id, id);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao aceitar troca:', error);
+    res.status(500).json({ error: 'Erro ao aceitar troca' });
+  }
+});
+
+// Aprovar/rejeitar troca (gestor)
+app.post('/api/trocas/:id/aprovar', (req, res) => {
+  const { id } = req.params;
+  const { aprovado, aprovador_id } = req.body;
+  
+  try {
+    const troca = db.prepare('SELECT * FROM trocas_plantao WHERE id = ?').get(id);
+    if (!troca) {
+      return res.status(404).json({ error: 'Troca não encontrada' });
+    }
+    
+    const status = aprovado ? 'aprovada' : 'rejeitada';
+    db.prepare(`
+      UPDATE trocas_plantao 
+      SET status = ?, aprovador_id = ?, aprovado_em = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(status, aprovador_id, id);
+    
+    // Se aprovada, atualiza a escala
+    if (aprovado && troca.aceito_por_id) {
+      db.prepare(`
+        UPDATE escalas SET funcionario_id = ? WHERE id = ?
+      `).run(troca.aceito_por_id, troca.escala_id);
+    }
+    
+    res.json({ success: true, status });
+  } catch (error) {
+    console.error('Erro ao aprovar troca:', error);
+    res.status(500).json({ error: 'Erro ao aprovar troca' });
+  }
+});
+
+// Cancelar troca
+app.delete('/api/trocas/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    db.prepare(`UPDATE trocas_plantao SET status = 'cancelada' WHERE id = ?`).run(id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao cancelar troca:', error);
+    res.status(500).json({ error: 'Erro ao cancelar troca' });
+  }
+});
+
+// ============ ANÚNCIOS DE PLANTÃO ============
+
+// Listar anúncios
+app.get('/api/anuncios', (req, res) => {
+  try {
+    const anuncios = db.prepare(`
+      SELECT 
+        a.*,
+        f.nome as gestor_nome,
+        (SELECT COUNT(*) FROM anuncios_candidaturas WHERE anuncio_id = a.id AND status = 'aprovada') as vagas_preenchidas
+      FROM anuncios_plantao a
+      LEFT JOIN funcionarios f ON a.gestor_id = f.id
+      ORDER BY a.created_at DESC
+    `).all();
+    res.json(anuncios);
+  } catch (error) {
+    console.error('Erro ao buscar anúncios:', error);
+    res.status(500).json({ error: 'Erro ao buscar anúncios' });
+  }
+});
+
+// Criar anúncio
+app.post('/api/anuncios', (req, res) => {
+  const { titulo, descricao, tipo, data_plantao, hora_inicio, hora_fim, valor_adicional, vagas, gestor_id } = req.body;
+  
+  if (!titulo || !gestor_id) {
+    return res.status(400).json({ error: 'Título e gestor são obrigatórios' });
+  }
+  
+  const id = uuidv4();
+  try {
+    db.prepare(`
+      INSERT INTO anuncios_plantao (id, gestor_id, titulo, descricao, tipo, data_plantao, hora_inicio, hora_fim, valor_adicional, vagas, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aberto')
+    `).run(id, gestor_id, titulo, descricao || '', tipo || 'normal', data_plantao, hora_inicio, hora_fim, valor_adicional || 0, vagas || 1);
+    
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error('Erro ao criar anúncio:', error);
+    res.status(500).json({ error: 'Erro ao criar anúncio' });
+  }
+});
+
+// Candidatar-se a um anúncio
+app.post('/api/anuncios/:id/candidatar', (req, res) => {
+  const { id } = req.params;
+  const { funcionario_id } = req.body;
+  
+  const candidaturaId = uuidv4();
+  try {
+    // Verifica se já existe candidatura
+    const existente = db.prepare(`
+      SELECT id FROM anuncios_candidaturas WHERE anuncio_id = ? AND funcionario_id = ?
+    `).get(id, funcionario_id);
+    
+    if (existente) {
+      return res.status(400).json({ error: 'Você já se candidatou a este anúncio' });
+    }
+    
+    db.prepare(`
+      INSERT INTO anuncios_candidaturas (id, anuncio_id, funcionario_id, status)
+      VALUES (?, ?, ?, 'pendente')
+    `).run(candidaturaId, id, funcionario_id);
+    
+    res.json({ success: true, id: candidaturaId });
+  } catch (error) {
+    console.error('Erro ao candidatar:', error);
+    res.status(500).json({ error: 'Erro ao candidatar' });
+  }
+});
+
+// Aprovar candidatura
+app.post('/api/anuncios/:id/aprovar-candidatura', (req, res) => {
+  const { id } = req.params;
+  const { candidatura_id, aprovado } = req.body;
+  
+  try {
+    const status = aprovado ? 'aprovada' : 'rejeitada';
+    db.prepare(`
+      UPDATE anuncios_candidaturas SET status = ?, aprovado_em = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(status, candidatura_id);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao aprovar candidatura:', error);
+    res.status(500).json({ error: 'Erro ao aprovar candidatura' });
+  }
+});
+
+// Regras de troca
+app.get('/api/regras-troca', (req, res) => {
+  try {
+    const regras = db.prepare('SELECT * FROM regras_troca').get();
+    res.json(regras || {});
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar regras' });
+  }
+});
+
+app.put('/api/regras-troca', (req, res) => {
+  const { intervalo_minimo_horas, max_horas_semana, max_horas_dia, aprovacao_automatica } = req.body;
+  
+  try {
+    db.prepare(`
+      UPDATE regras_troca SET 
+        intervalo_minimo_horas = ?,
+        max_horas_semana = ?,
+        max_horas_dia = ?,
+        aprovacao_automatica = ?
+    `).run(intervalo_minimo_horas, max_horas_semana, max_horas_dia, aprovacao_automatica ? 1 : 0);
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar regras' });
+  }
 });
 
 // Servir arquivos estáticos do React em produção

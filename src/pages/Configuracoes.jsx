@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, Clock, DollarSign, Bell, AlertTriangle } from 'lucide-react';
+import { Settings, Save, Clock, DollarSign, Bell, AlertTriangle, Smartphone, Download } from 'lucide-react';
 import { API_URL } from '../config';
+import { 
+  isPushSupported, 
+  getNotificationPermission, 
+  requestNotificationPermission,
+  showLocalNotification 
+} from '../utils/notifications';
 
 function Configuracoes() {
   const [config, setConfig] = useState({
@@ -14,9 +20,34 @@ function Configuracoes() {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState(null);
+  const [notificationPermission, setNotificationPermission] = useState('default');
+  const [pwaInstalled, setPwaInstalled] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
     fetchConfiguracoes();
+    
+    // Verificar permissão de notificações
+    if (isPushSupported()) {
+      setNotificationPermission(getNotificationPermission());
+    }
+    
+    // Verificar se PWA está instalado
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setPwaInstalled(true);
+    }
+    
+    // Capturar evento de instalação PWA
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
 
   const fetchConfiguracoes = async () => {
@@ -29,6 +60,40 @@ function Configuracoes() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRequestNotifications = async () => {
+    const granted = await requestNotificationPermission();
+    setNotificationPermission(granted ? 'granted' : 'denied');
+    
+    if (granted) {
+      showLocalNotification('✅ Notificações Ativadas!', {
+        body: 'Você receberá alertas de escalas e lembretes.',
+        tag: 'permission-granted'
+      });
+    }
+  };
+
+  const handleInstallPWA = async () => {
+    if (!deferredPrompt) {
+      alert('Para instalar, use a opção "Adicionar à tela inicial" no menu do navegador.');
+      return;
+    }
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      setPwaInstalled(true);
+      setDeferredPrompt(null);
+    }
+  };
+
+  const handleTestNotification = () => {
+    showLocalNotification('🧪 Teste de Notificação', {
+      body: 'Se você está vendo isto, as notificações estão funcionando!',
+      tag: 'test-notification'
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -149,7 +214,7 @@ function Configuracoes() {
             <div className="card-header">
               <h2 className="card-title">
                 <Bell size={20} className="mr-2" />
-                Notificações
+                Notificações por Email
               </h2>
             </div>
             
@@ -193,6 +258,92 @@ function Configuracoes() {
                 />
                 <span>Notificar sobre novas escalas</span>
               </label>
+            </div>
+          </div>
+
+          {/* Push Notifications / PWA */}
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">
+                <Smartphone size={20} className="mr-2" />
+                App & Push Notifications
+              </h2>
+            </div>
+            
+            {/* Status PWA */}
+            <div className="mb-3 p-3" style={{ backgroundColor: 'var(--background-primary)', borderRadius: '8px' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="font-semibold">📱 Instalar App</p>
+                  <p className="text-xs text-secondary">
+                    {pwaInstalled 
+                      ? '✅ App instalado no dispositivo' 
+                      : 'Instale o app para acesso rápido'}
+                  </p>
+                </div>
+                {!pwaInstalled && (
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleInstallPWA}
+                    style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                  >
+                    <Download size={16} />
+                    Instalar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Status Push Notifications */}
+            {isPushSupported() ? (
+              <div className="mb-3 p-3" style={{ backgroundColor: 'var(--background-primary)', borderRadius: '8px' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="font-semibold">🔔 Push Notifications</p>
+                    <p className="text-xs text-secondary">
+                      {notificationPermission === 'granted' 
+                        ? '✅ Notificações ativadas' 
+                        : notificationPermission === 'denied'
+                          ? '❌ Notificações bloqueadas (altere nas configurações do navegador)'
+                          : 'Receba alertas mesmo com o app fechado'}
+                    </p>
+                  </div>
+                  {notificationPermission === 'default' && (
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={handleRequestNotifications}
+                      style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                    >
+                      <Bell size={16} />
+                      Ativar
+                    </button>
+                  )}
+                  {notificationPermission === 'granted' && (
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={handleTestNotification}
+                      style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                    >
+                      🧪 Testar
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="alert alert-warning">
+                <AlertTriangle size={20} />
+                <span>Push notifications não são suportadas neste navegador</span>
+              </div>
+            )}
+
+            <div className="text-sm text-secondary">
+              <p className="font-semibold mb-1">Você receberá notificações sobre:</p>
+              <ul style={{ marginLeft: '1rem', listStyle: 'disc' }}>
+                <li>Lembretes de plantão (1 hora antes)</li>
+                <li>Novas escalas atribuídas</li>
+                <li>Propostas de troca de plantão</li>
+                <li>Alertas de furos (para gestores)</li>
+              </ul>
             </div>
           </div>
 

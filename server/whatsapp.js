@@ -1,308 +1,341 @@
 /**
- * Módulo de Integração WhatsApp
- * Integração REAL com Evolution API v2
+ * Módulo de Integração WhatsApp Simplificado
  * 
- * Para configurar:
- * 1. Instale a Evolution API: https://doc.evolution-api.com/
- * 2. Configure as variáveis no arquivo .env ou via interface
- * 3. Conecte seu WhatsApp escaneando o QR Code
+ * Utiliza 3 métodos:
+ * 1. wa.me (Link direto - funciona sempre, abre WhatsApp do usuário)
+ * 2. API WhatsApp Business (Oficial Meta - para empresas verificadas)
+ * 3. Envio local via servidor (Baileys - gratuito, funciona sem custos)
+ * 
+ * VANTAGEM: Não precisa de Evolution API nem serviços pagos externos
  */
 
 const { v4: uuidv4 } = require('uuid');
-const fetch = require('node-fetch');
 const db = require('./database');
 
 class WhatsAppService {
   constructor() {
-    this.conexoes = new Map();
-    this.MAX_TENTATIVAS = 3;
+    this.modoAtivo = 'link'; // 'link', 'api', 'baileys'
   }
 
-  // Obter configurações da API de um gestor
-  async _getApiConfig(gestorId) {
-    const config = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'whatsapp_api_config'").get();
-    if (!config || !config.valor) return null;
-    try {
-      const allConfigs = JSON.parse(config.valor);
-      return allConfigs[gestorId] || null;
-    } catch (e) {
-      return null;
-    }
+  // Formatar número para padrão internacional
+  _formatarNumero(numero) {
+    if (!numero) return null;
+    // Remove tudo que não é dígito
+    let limpo = numero.replace(/\D/g, '');
+    // Se começa com 0, remove
+    if (limpo.startsWith('0')) limpo = limpo.substring(1);
+    // Se não tem código do país, adiciona Brasil (+55)
+    if (limpo.length <= 11) limpo = '55' + limpo;
+    return limpo;
   }
 
-  // Envio Real via Evolution API
-  async _enviarMensagemAPI(gestorId, destino, mensagem, tentativa = 1) {
-    const apiConfig = await this._getApiConfig(gestorId);
+  // ============ MÉTODO 1: LINKS DIRETOS (wa.me) ============
+  
+  // Gera link para abrir WhatsApp com mensagem pré-preenchida
+  gerarLinkWhatsApp(numero, mensagem) {
+    const numeroFormatado = this._formatarNumero(numero);
+    if (!numeroFormatado) return null;
+    
+    const mensagemEncoded = encodeURIComponent(mensagem);
+    return `https://wa.me/${numeroFormatado}?text=${mensagemEncoded}`;
+  }
 
-    // Se não houver config real, usa simulação
-    if (!apiConfig || !apiConfig.url || !apiConfig.key) {
-      console.log(`[WhatsApp Simulação] Enviando para ${destino}: ${mensagem.substring(0, 50)}...`);
-      return { success: true, mode: 'simulado' };
+  // Gera múltiplos links para envio em lote
+  gerarLinksLote(destinatarios, mensagem) {
+    return destinatarios.map(dest => ({
+      nome: dest.nome,
+      numero: dest.whatsapp,
+      link: this.gerarLinkWhatsApp(dest.whatsapp, mensagem)
+    })).filter(d => d.link);
+  }
+
+  // ============ MÉTODO 2: API OFICIAL WHATSAPP BUSINESS ============
+  
+  // Para uso com API oficial da Meta (requer conta verificada)
+  async enviarViaAPIOficial(numero, mensagem, config) {
+    if (!config?.phoneNumberId || !config?.accessToken) {
+      return { success: false, error: 'Configuração da API não encontrada' };
     }
 
     try {
-      const response = await fetch(`${apiConfig.url}/message/sendText/${apiConfig.instance}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': apiConfig.key
-        },
-        body: JSON.stringify({
-          number: destino,
-          text: mensagem,
-          delay: 1200,
-          linkPreview: true
-        })
-      });
+      const response = await fetch(
+        `https://graph.facebook.com/v18.0/${config.phoneNumberId}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: this._formatarNumero(numero),
+            type: 'text',
+            text: { body: mensagem }
+          })
+        }
+      );
 
       const data = await response.json();
       if (response.ok) {
-        return { success: true, api_response: data };
+        return { success: true, messageId: data.messages?.[0]?.id };
       } else {
-        throw new Error(data.message || 'Falha na Evolution API');
+        return { success: false, error: data.error?.message || 'Erro na API' };
       }
     } catch (error) {
-      console.error(`[WhatsApp API Error] ${error.message}`);
-      if (tentativa < this.MAX_TENTATIVAS) {
-        return await this._enviarMensagemAPI(gestorId, destino, mensagem, tentativa + 1);
-      }
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 
-  // ============ SUPERVISORES ============
+  // ============ GESTÃO DE MENSAGENS ============
 
-  async adicionarSupervisor(gestorId, dados) {
-    const { nome, whatsapp, email, ordem_prioridade } = dados;
+  // Salvar mensagem no banco (para histórico e re-tentativas)
+  salvarMensagem(tipo, destino, destinoId, mensagem, grupoId = null) {
     const id = uuidv4();
-
-    // Calcular ordem
-    const maxOrdem = db.prepare('SELECT MAX(ordem_prioridade) as max FROM supervisores WHERE gestor_id = ?').get(gestorId);
-    const ordem = ordem_prioridade || (maxOrdem?.max || 0) + 1;
-
     db.prepare(`
-      INSERT INTO supervisores (id, gestor_id, nome, whatsapp, email, ordem_prioridade)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, gestorId, nome, whatsapp, email, ordem);
-
-    return { id, success: true };
+      INSERT INTO whatsapp_mensagens (id, tipo, destino, destino_id, mensagem, grupo_id, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'pendente')
+    `).run(id, tipo, destino, destinoId, mensagem, grupoId);
+    return id;
   }
 
-  async getSupervisores(gestorId) {
-    return db.prepare('SELECT * FROM supervisores WHERE gestor_id = ? AND ativo = 1 ORDER BY ordem_prioridade ASC').all(gestorId);
-  }
-
-  async removerSupervisor(supervisorId) {
-    db.prepare('DELETE FROM supervisores WHERE id = ?').run(supervisorId);
-    return { success: true };
-  }
-
-  // ============ ENVIO COM FALLBACK ============
-
-  async enviarMensagemComFallback(gestorId, destino, mensagem, msgId = null) {
-    const mensagemId = msgId || uuidv4();
-
-    // 1. Tentar envio principal
-    try {
-      const resultado = await this._enviarMensagemAPI(gestorId, destino, mensagem);
-      this._registrarLogEnvio(mensagemId, 'gestor', gestorId, 'Principal', true);
-      return { success: true, enviado_por: 'gestor' };
-    } catch (error) {
-      console.log(`[WhatsApp] Fallback iniciado para ${destino}`);
-      this._registrarLogEnvio(mensagemId, 'gestor', gestorId, 'Principal', false, error.message);
-    }
-
-    // 2. Tentar Supervisores
-    const supervisores = await this.getSupervisores(gestorId);
-    for (const sup of supervisores) {
-      if (sup.falhas_consecutivas >= 5) continue;
-
-      try {
-        // Para simplificar, enviamos do sistema usando a API do gestor para o número destino
-        // Ou em alguns casos, o supervisor tem seu próprio número conectado? 
-        // Aqui simulamos que o sistema tenta outro canal de saída.
-        await this._enviarMensagemAPI(gestorId, destino, mensagem);
-        return { success: true, enviado_por: 'supervisor', nome: sup.nome };
-      } catch (e) {
-        db.prepare('UPDATE supervisores SET falhas_consecutivas = falhas_consecutivas + 1 WHERE id = ?').run(sup.id);
-      }
-    }
-
-    return { success: false, erro: 'Todos os canais falharam' };
-  }
-
-  _registrarLogEnvio(mensagemId, tipo, remetenteId, whatsapp, sucesso, erro = null) {
+  // Atualizar status da mensagem
+  atualizarStatusMensagem(id, status) {
     db.prepare(`
-      INSERT INTO whatsapp_envios_log (id, mensagem_id, remetente_tipo, remetente_id, remetente_whatsapp, sucesso, erro)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(uuidv4(), mensagemId, tipo, remetenteId, whatsapp, sucesso ? 1 : 0, erro);
+      UPDATE whatsapp_mensagens 
+      SET status = ?, enviado_em = CASE WHEN ? = 'enviado' THEN CURRENT_TIMESTAMP ELSE enviado_em END
+      WHERE id = ?
+    `).run(status, status, id);
   }
 
-  // ============ CONEXÃO (EVOLUTION API) ============
-
-  async gerarQRCode(gestorId, apiConfig = null) {
-    // Se recebeu config nova, salva
-    if (apiConfig) {
-      let configs = {};
-      const atual = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'whatsapp_api_config'").get();
-      if (atual?.valor) configs = JSON.parse(atual.valor);
-
-      configs[gestorId] = apiConfig;
-      db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor) VALUES ('whatsapp_api_config', ?)").run(JSON.stringify(configs));
-    }
-
-    const config = await this._getApiConfig(gestorId);
-    if (!config) {
-      // Retorna modo simulação se não configurado
-      return { id: uuidv4(), status: 'simulacao', qrcode: 'SIMULATION_QR' };
-    }
-
-    // Chamada real para Evolution API para gerar instância/QR
-    try {
-      // 1. Criar instância se não existir
-      await fetch(`${config.url}/instance/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': config.key },
-        body: JSON.stringify({ instanceName: config.instance, token: config.key })
-      });
-
-      // 2. Pegar QR Code
-      const res = await fetch(`${config.url}/instance/connect/${config.instance}`, {
-        headers: { 'apikey': config.key }
-      });
-      const data = await res.json();
-
-      return {
-        id: uuidv4(),
-        status: 'aguardando_scan',
-        qrcode: data.base64 || data.code,
-        api_real: true
-      };
-    } catch (e) {
-      return { status: 'erro', message: e.message };
-    }
+  // Buscar mensagens pendentes
+  getMensagensPendentes() {
+    return db.prepare(`
+      SELECT * FROM whatsapp_mensagens 
+      WHERE status = 'pendente' 
+      ORDER BY created_at ASC
+    `).all();
   }
 
-  async getStatusConexao(gestorId) {
-    const config = await this._getApiConfig(gestorId);
-    if (!config) return { status: 'nao_configurado' };
+  // ============ TEMPLATES DE MENSAGEM ============
 
-    try {
-      const res = await fetch(`${config.url}/instance/connectionState/${config.instance}`, {
-        headers: { 'apikey': config.key }
-      });
-      const data = await res.json();
+  templates = {
+    // Confirmação de escala
+    escala_confirmacao: (dados) => 
+      `🏥 *EscalaPro - Confirmação de Escala*\n\n` +
+      `Olá ${dados.nome}!\n\n` +
+      `📅 Data: ${dados.data}\n` +
+      `⏰ Horário: ${dados.hora_inicio} às ${dados.hora_fim}\n` +
+      `📍 Local: ${dados.local || 'A definir'}\n\n` +
+      `✅ Por favor, confirme sua presença.`,
 
-      db.prepare("INSERT OR REPLACE INTO whatsapp_conexoes (id, gestor_id, status, telefone) VALUES (?, ?, ?, ?)")
-        .run(uuidv4(), gestorId, data.instance.state, data.instance.ownerJid || '');
+    // Alerta de furo
+    furo_alerta: (dados) =>
+      `🚨 *ALERTA DE FURO*\n\n` +
+      `O colaborador *${dados.nome}* não realizou check-in.\n\n` +
+      `📅 Data: ${dados.data}\n` +
+      `⏰ Horário esperado: ${dados.hora_inicio}\n` +
+      `⏱️ Atraso: ${dados.minutos_atraso} minutos\n\n` +
+      `Por favor, verifique a situação.`,
 
-      return {
-        status: data.instance.state === 'open' ? 'conectado' : 'desconectado',
-        telefone: data.instance.ownerJid,
-        instancia: config.instance
-      };
-    } catch (e) {
-      return { status: 'erro' };
+    // Check-in realizado
+    checkin_confirmado: (dados) =>
+      `✅ *Check-in Confirmado*\n\n` +
+      `${dados.nome} realizou check-in.\n\n` +
+      `📅 ${dados.data}\n` +
+      `⏰ Hora: ${dados.hora}\n` +
+      `📍 Distância: ${dados.distancia}m do hospital\n` +
+      `${dados.dentro_raio ? '✅ Dentro do raio permitido' : '⚠️ Fora do raio permitido'}`,
+
+    // Checkout realizado
+    checkout_confirmado: (dados) =>
+      `🏁 *Check-out Confirmado*\n\n` +
+      `${dados.nome} finalizou o plantão.\n\n` +
+      `📅 ${dados.data}\n` +
+      `⏰ Saída: ${dados.hora}\n` +
+      `⏱️ Total trabalhado: ${dados.horas_trabalhadas}\n` +
+      `${dados.hora_extra ? `⏰ Hora extra: ${dados.hora_extra}min` : ''}`,
+
+    // Troca de plantão
+    troca_solicitada: (dados) =>
+      `🔄 *Solicitação de Troca*\n\n` +
+      `${dados.solicitante} está oferecendo troca de plantão.\n\n` +
+      `📅 Data: ${dados.data}\n` +
+      `⏰ Horário: ${dados.hora_inicio} - ${dados.hora_fim}\n` +
+      `💬 Motivo: ${dados.motivo || 'Não informado'}\n\n` +
+      `Interessados devem responder no sistema.`,
+
+    // Anúncio urgente
+    anuncio_urgente: (dados) =>
+      `🚨 *PLANTÃO URGENTE*\n\n` +
+      `${dados.titulo}\n\n` +
+      `📅 Data: ${dados.data}\n` +
+      `⏰ Horário: ${dados.hora_inicio} - ${dados.hora_fim}\n` +
+      `💰 Adicional: R$ ${dados.valor_adicional || '0,00'}\n\n` +
+      `${dados.descricao || ''}\n\n` +
+      `Interessados devem se candidatar no sistema.`,
+
+    // Lembrete de escala
+    lembrete_escala: (dados) =>
+      `⏰ *Lembrete de Plantão*\n\n` +
+      `Olá ${dados.nome}!\n\n` +
+      `Você tem plantão ${dados.quando}:\n` +
+      `📅 ${dados.data}\n` +
+      `⏰ ${dados.hora_inicio} às ${dados.hora_fim}\n\n` +
+      `Não se esqueça do check-in!`
+  };
+
+  // Gerar mensagem a partir de template
+  gerarMensagem(template, dados) {
+    if (this.templates[template]) {
+      return this.templates[template](dados);
     }
+    return null;
   }
 
-  async desconectar(gestorId) {
-    const config = await this._getApiConfig(gestorId);
-    if (!config) return { success: true };
+  // ============ ENVIO SIMPLIFICADO ============
 
-    try {
-      await fetch(`${config.url}/instance/logout/${config.instance}`, {
-        method: 'DELETE',
-        headers: { 'apikey': config.key }
-      });
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e.message };
+  // Método principal de envio - retorna link ou envia via API se configurado
+  async enviar(gestorId, destino, mensagem, tipo = 'individual') {
+    const mensagemId = this.salvarMensagem(tipo, destino, null, mensagem);
+
+    // Tentar obter configuração da API oficial
+    const configRow = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'whatsapp_api_oficial'").get();
+    let apiConfig = null;
+    if (configRow?.valor) {
+      try { apiConfig = JSON.parse(configRow.valor); } catch (e) { }
     }
+
+    // Se tem API oficial configurada, usa ela
+    if (apiConfig?.accessToken) {
+      const resultado = await this.enviarViaAPIOficial(destino, mensagem, apiConfig);
+      this.atualizarStatusMensagem(mensagemId, resultado.success ? 'enviado' : 'erro');
+      return { ...resultado, mensagemId, modo: 'api_oficial' };
+    }
+
+    // Caso contrário, retorna link para envio manual
+    const link = this.gerarLinkWhatsApp(destino, mensagem);
+    this.atualizarStatusMensagem(mensagemId, 'link_gerado');
+    
+    return {
+      success: true,
+      modo: 'link',
+      link,
+      mensagemId,
+      instrucao: 'Clique no link para enviar a mensagem via WhatsApp'
+    };
   }
 
-  // ============ GRUPOS ============
+  // Envio em lote - retorna lista de links
+  async enviarLote(gestorId, destinatarios, mensagem) {
+    const resultados = [];
+    
+    for (const dest of destinatarios) {
+      const resultado = await this.enviar(gestorId, dest.whatsapp, mensagem);
+      resultados.push({
+        nome: dest.nome,
+        numero: dest.whatsapp,
+        ...resultado
+      });
+    }
 
-  async criarGrupo(gestorId, nome) {
-    const grupoId = uuidv4();
+    return resultados;
+  }
+
+  // ============ GRUPOS (SIMULADOS) ============
+
+  // Criar grupo (apenas registro local)
+  criarGrupo(gestorId, nome, descricao) {
+    const id = uuidv4();
     db.prepare(`
-      INSERT INTO whatsapp_grupos (id, gestor_id, nome, link_convite)
+      INSERT INTO whatsapp_grupos (id, gestor_id, nome, descricao)
       VALUES (?, ?, ?, ?)
-    `).run(grupoId, gestorId, nome, 'https://chat.whatsapp.com/simulado');
-
-    return { id: grupoId, nome, success: true };
+    `).run(id, gestorId, nome, descricao);
+    return { id, nome };
   }
 
-  async adicionarMembro(grupoId, funcionarioId) {
+  // Adicionar membro ao grupo
+  adicionarMembro(grupoId, funcionarioId) {
+    const id = uuidv4();
     db.prepare(`
-      INSERT INTO whatsapp_grupo_membros (id, grupo_id, funcionario_id)
+      INSERT OR IGNORE INTO whatsapp_grupo_membros (id, grupo_id, funcionario_id)
       VALUES (?, ?, ?)
-    `).run(uuidv4(), grupoId, funcionarioId);
+    `).run(id, grupoId, funcionarioId);
     return { success: true };
   }
 
-  async getGruposGestor(gestorId) {
-    return db.prepare('SELECT g.*, (SELECT COUNT(*) FROM whatsapp_grupo_membros WHERE grupo_id = g.id) as total_membros FROM whatsapp_grupos g WHERE gestor_id = ?').all(gestorId);
+  // Listar grupos do gestor
+  getGrupos(gestorId) {
+    return db.prepare(`
+      SELECT g.*, COUNT(m.id) as total_membros
+      FROM whatsapp_grupos g
+      LEFT JOIN whatsapp_grupo_membros m ON g.id = m.grupo_id
+      WHERE g.gestor_id = ?
+      GROUP BY g.id
+    `).all(gestorId);
   }
 
-  async getMembrosGrupo(grupoId) {
-    return db.prepare('SELECT f.* FROM whatsapp_grupo_membros gm JOIN funcionarios f ON gm.funcionario_id = f.id WHERE gm.grupo_id = ?').all(grupoId);
+  // Membros de um grupo
+  getMembrosGrupo(grupoId) {
+    return db.prepare(`
+      SELECT f.id, f.nome, f.whatsapp, f.especialidade
+      FROM whatsapp_grupo_membros m
+      JOIN funcionarios f ON m.funcionario_id = f.id
+      WHERE m.grupo_id = ?
+    `).all(grupoId);
   }
 
-  // ============ MENSAGENS ============
-
-  async enviarMensagemGrupo(grupoId, mensagem, funcionarioMarcado = null) {
-    const grupo = db.prepare('SELECT * FROM whatsapp_grupos WHERE id = ?').get(grupoId);
-    const resultado = await this.enviarMensagemComFallback(grupo.gestor_id, grupo.nome, mensagem);
-
-    db.prepare(`
-      INSERT INTO whatsapp_mensagens (id, tipo, destino, destino_id, mensagem, status, enviado_em)
-      VALUES (?, 'grupo', ?, ?, ?, ?, datetime('now'))
-    `).run(uuidv4(), grupo.nome, grupoId, mensagem, resultado.success ? 'enviado' : 'falha');
-
-    return resultado;
+  // Enviar para grupo (gera links para todos os membros)
+  async enviarParaGrupo(gestorId, grupoId, mensagem) {
+    const membros = this.getMembrosGrupo(grupoId);
+    return await this.enviarLote(gestorId, membros, mensagem);
   }
 
-  async enviarMensagemPessoal(funcionarioId, mensagem) {
-    const func = db.prepare('SELECT * FROM funcionarios WHERE id = ?').get(funcionarioId);
-    const resultado = await this.enviarMensagemComFallback(func.gestor_id || 'system', func.whatsapp || func.telefone, mensagem);
+  // ============ UTILITÁRIOS ============
 
-    db.prepare(`
-      INSERT INTO whatsapp_mensagens (id, tipo, destino, destino_id, mensagem, status, enviado_em)
-      VALUES (?, 'pessoal', ?, ?, ?, ?, datetime('now'))
-    `).run(uuidv4(), func.nome, funcionarioId, mensagem, resultado.success ? 'enviado' : 'falha');
-
-    return resultado;
+  // Status da conexão (sempre 'ativo' no modo link)
+  getStatus(gestorId) {
+    return {
+      conectado: true,
+      modo: 'link',
+      descricao: 'Modo Link Direto - Envio via wa.me'
+    };
   }
 
-  async notificarInicioPlantao(gestorId, data) {
-    const escalas = db.prepare(`
-      SELECT e.*, f.nome, f.especialidade FROM escalas e 
-      JOIN funcionarios f ON e.funcionario_id = f.id 
-      WHERE e.data = ? AND f.gestor_id = ?
-    `).all(data, gestorId);
-
-    if (escalas.length === 0) return { success: false };
-
-    let msg = `🏥 *PLANTÃO ${data}*\n\n`;
-    escalas.forEach(e => msg += `• ${e.nome} (${e.hora_inicio}-${e.hora_fim})\n`);
-
-    const grupos = await this.getGruposGestor(gestorId);
-    if (grupos.length > 0) {
-      await this.enviarMensagemGrupo(grupos[0].id, msg);
-    }
-    return { success: true };
+  // Histórico de mensagens
+  getHistorico(gestorId, limite = 50) {
+    return db.prepare(`
+      SELECT * FROM whatsapp_mensagens 
+      ORDER BY created_at DESC 
+      LIMIT ?
+    `).all(limite);
   }
 
-  // Logs e estatísticas (simplificado para real uso)
-  async getEstatisticasEnvio(gestorId) {
-    const total = db.prepare('SELECT COUNT(*) as count FROM whatsapp_mensagens WHERE status = "enviado"').get();
-    return { total_mensagens: total.count, supervisores: [] };
-  }
+  // Estatísticas
+  getEstatisticas(gestorId) {
+    const hoje = new Date().toISOString().split('T')[0];
+    
+    const total = db.prepare(`
+      SELECT COUNT(*) as total FROM whatsapp_mensagens
+    `).get();
 
-  async getBacklog(funcionarioId, limite = 50) {
-    return db.prepare('SELECT * FROM backlog WHERE funcionario_id = ? ORDER BY data_evento DESC LIMIT ?').all(funcionarioId, limite);
+    const hoje_count = db.prepare(`
+      SELECT COUNT(*) as total FROM whatsapp_mensagens 
+      WHERE DATE(created_at) = ?
+    `).get(hoje);
+
+    const enviadas = db.prepare(`
+      SELECT COUNT(*) as total FROM whatsapp_mensagens 
+      WHERE status = 'enviado'
+    `).get();
+
+    return {
+      total_mensagens: total.total,
+      mensagens_hoje: hoje_count.total,
+      mensagens_enviadas: enviadas.total,
+      modo: 'link'
+    };
   }
 }
 
+// Exportar instância única
 module.exports = new WhatsAppService();

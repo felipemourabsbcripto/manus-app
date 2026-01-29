@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Calendar, Clock, AlertTriangle,
-  DollarSign, Bell, Settings, MessageSquare, FileText, LogOut, Heart, Menu, X
+  DollarSign, Bell, Settings, MessageSquare, FileText, LogOut, Heart, Menu, X,
+  ArrowRightLeft
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Funcionarios from './pages/Funcionarios';
@@ -16,6 +17,7 @@ import Configuracoes from './pages/Configuracoes';
 import WhatsApp from './pages/WhatsApp';
 import CheckIn from './pages/CheckIn';
 import Relatorios from './pages/Relatorios';
+import Trocas from './pages/Trocas';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -39,7 +41,7 @@ const PrivateRoute = () => {
 const AppLayout = () => {
   const [avisosNaoLidos, setAvisosNaoLidos] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { logout, user } = useAuth();
+  const { logout, user, hasPermission, isGestorOrAdmin, isMedico } = useAuth();
 
   useEffect(() => {
     const fetchAvisosNaoLidos = async () => {
@@ -86,12 +88,7 @@ const AppLayout = () => {
         )}
         <div className="logo">
           <div className="logo-icon">
-            <img src={logo} alt="Hospital Santa Casa BH" />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Hospital</span>
-            <h1>Santa Casa BH</h1>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>GESTÃO DE PLANTÕES</span>
+            <img src={logo} alt="EscalaPro" style={{ width: '50px', height: '50px' }} />
           </div>
         </div>
 
@@ -106,45 +103,64 @@ const AppLayout = () => {
             <span>Escalas</span>
           </NavLink>
 
-          <NavLink to="/funcionarios" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <Users />
-            <span>Médicos e Equipe</span>
+          {hasPermission('canManageFuncionarios') && (
+            <NavLink to="/funcionarios" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <Users />
+              <span>Médicos e Equipe</span>
+            </NavLink>
+          )}
+
+          {hasPermission('canViewPresencas') && (
+            <NavLink to="/presencas" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <Clock />
+              <span>Plantões</span>
+            </NavLink>
+          )}
+
+          {isGestorOrAdmin() && (
+            <NavLink to="/furos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <AlertTriangle />
+              <span>Atrasos e Ausências</span>
+            </NavLink>
+          )}
+
+          <NavLink to="/trocas" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <ArrowRightLeft />
+            <span>Trocas de Plantão</span>
           </NavLink>
 
-          <NavLink to="/presencas" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <Clock />
-            <span>Plantões</span>
-          </NavLink>
-
-          <NavLink to="/furos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <AlertTriangle />
-            <span>Atrasos e Ausências</span>
-          </NavLink>
-
-          <NavLink to="/pagamentos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <DollarSign />
-            <span>Pagamentos</span>
-          </NavLink>
+          {hasPermission('canManagePagamentos') && (
+            <NavLink to="/pagamentos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <DollarSign />
+              <span>Pagamentos</span>
+            </NavLink>
+          )}
 
           <NavLink to="/avisos" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Bell />
             <span>Avisos</span>
           </NavLink>
 
-          <NavLink to="/whatsapp" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <MessageSquare />
-            <span>Comunicação</span>
-          </NavLink>
+          {isGestorOrAdmin() && (
+            <NavLink to="/whatsapp" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <MessageSquare />
+              <span>Comunicação</span>
+            </NavLink>
+          )}
 
-          <NavLink to="/relatorios" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <FileText />
-            <span>Relatórios</span>
-          </NavLink>
+          {hasPermission('canViewRelatorios') && (
+            <NavLink to="/relatorios" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <FileText />
+              <span>Relatórios</span>
+            </NavLink>
+          )}
 
-          <NavLink to="/configuracoes" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <Settings />
-            <span>Configurações</span>
-          </NavLink>
+          {hasPermission('canAccessConfig') && (
+            <NavLink to="/configuracoes" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <Settings />
+              <span>Configurações</span>
+            </NavLink>
+          )}
 
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{
@@ -193,6 +209,7 @@ function App() {
               <Route path="/checkin" element={<CheckIn />} />
               <Route path="/presencas" element={<Presencas />} />
               <Route path="/furos" element={<Furos />} />
+              <Route path="/trocas" element={<Trocas />} />
               <Route path="/whatsapp" element={<WhatsApp />} />
               <Route path="/notas" element={<Notas />} />
               <Route path="/pagamentos" element={<Pagamentos />} />
